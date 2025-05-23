@@ -17,7 +17,9 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Agriculture
 import androidx.compose.material.icons.filled.DeviceThermostat
+import androidx.compose.material.icons.filled.Grass
 import androidx.compose.material.icons.filled.WaterDrop
 import androidx.compose.material.icons.filled.WbSunny
 import androidx.compose.material3.*
@@ -114,7 +116,7 @@ fun SensorScreen(viewModel: MainViewModel) {
                         )
 
                         SensorCard(
-                            icon = Icons.Default.WaterDrop,
+                            icon = Icons.Default.Grass,
                             title = "土壤湿度",
                             value = "${data.soil}",
                             color = MaterialTheme.colorScheme.primary,
@@ -328,42 +330,44 @@ fun StatusIndicator(
         if (isUpdating) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.primary
     val statusText = if (isUpdating) "正在更新..." else "实时监控中"
 
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.Center
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Box(
-            modifier = Modifier
-                .size(12.dp * scale)
-                .clip(RoundedCornerShape(6.dp))
-                .background(statusColor)
-        )
+        // 状态行：圆点和状态文字在同一行
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(12.dp * scale)
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(statusColor)
+            )
 
-        Spacer(modifier = Modifier.width(8.dp))
+            Spacer(modifier = Modifier.width(8.dp))
 
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
                 text = statusText,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Medium
             )
+        }
 
-            if (lastUpdateTime > 0L && !isUpdating) {
-                val updateTime = remember(lastUpdateTime) {
-                    java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault())
-                        .format(java.util.Date(lastUpdateTime))
-                }
-                Text(
-                    text = "更新时间: $updateTime",
-                    fontSize = 12.sp,
-                    modifier = Modifier.padding(top = 2.dp)
-                )
+        if (lastUpdateTime > 0L && !isUpdating) {
+            val updateTime = remember(lastUpdateTime) {
+                java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault())
+                    .format(java.util.Date(lastUpdateTime))
             }
+            Text(
+                text = "更新时间: $updateTime",
+                fontSize = 12.sp,
+                modifier = Modifier.padding(top = 4.dp)
+            )
         }
     }
 }
 
-// 辅助函数
 fun getTemperatureStatus(temp: Double): String {
     return when {
         temp < 18 -> "偏冷"
