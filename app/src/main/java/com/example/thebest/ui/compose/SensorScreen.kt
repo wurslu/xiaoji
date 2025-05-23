@@ -37,15 +37,15 @@ fun SensorScreen(viewModel: MainViewModel) {
         // 每5秒静默刷新一次
         while (true) {
             delay(5000)
-            viewModel.refreshDataSilently()
+            viewModel.refreshDataSilently() // 使用静默刷新
         }
     }
 
-    // 渐变背景
+    // 更温和的渐变背景 - 与底部导航栏更协调
     val gradientColors = listOf(
-        Color(0xFF667eea),
-        Color(0xFF764ba2),
-        Color(0xFF6B73FF)
+        MaterialTheme.colorScheme.background,
+        MaterialTheme.colorScheme.surface,
+        MaterialTheme.colorScheme.surfaceVariant
     )
 
     Box(
@@ -65,17 +65,15 @@ fun SensorScreen(viewModel: MainViewModel) {
             Spacer(modifier = Modifier.height(40.dp))
 
             Text(
-                text = "智能传感器监控",
+                text = "大鹏环境",
                 fontSize = 28.sp,
                 fontWeight = FontWeight.Bold,
-                color = Color.White,
                 textAlign = TextAlign.Center
             )
 
             Text(
-                text = "实时环境数据监测",
+                text = "实时数据监测",
                 fontSize = 16.sp,
-                color = Color.White.copy(alpha = 0.8f),
                 textAlign = TextAlign.Center,
                 modifier = Modifier.padding(top = 8.dp)
             )
@@ -99,7 +97,7 @@ fun SensorScreen(viewModel: MainViewModel) {
                             icon = Icons.Default.DeviceThermostat,
                             title = "温度",
                             value = "${data.temperature}°C",
-                            color = Color(0xFFFF6B6B),
+                            color = MaterialTheme.colorScheme.error,
                             subtitle = getTemperatureStatus(data.temperature)
                         )
 
@@ -107,7 +105,7 @@ fun SensorScreen(viewModel: MainViewModel) {
                             icon = Icons.Default.WaterDrop,
                             title = "湿度",
                             value = "${data.humidity}%",
-                            color = Color(0xFF4ECDC4),
+                            color = MaterialTheme.colorScheme.tertiary,
                             subtitle = getHumidityStatus(data.humidity)
                         )
 
@@ -115,7 +113,7 @@ fun SensorScreen(viewModel: MainViewModel) {
                             icon = Icons.Default.WbSunny,
                             title = "光照强度",
                             value = "${data.light}",
-                            color = Color(0xFFFFE66D),
+                            color = MaterialTheme.colorScheme.secondary,
                             subtitle = getLightStatus(data.light)
                         )
                     }
@@ -153,7 +151,7 @@ fun SensorCard(
             .height(120.dp),
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(
-            containerColor = Color.White.copy(alpha = 0.95f)
+            containerColor = MaterialTheme.colorScheme.surface
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
     ) {
@@ -187,8 +185,8 @@ fun SensorCard(
             ) {
                 Text(
                     text = title,
-                    fontSize = 16.sp,
-                    color = Color.Gray,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontWeight = FontWeight.Medium
                 )
 
@@ -196,7 +194,7 @@ fun SensorCard(
                     text = value,
                     fontSize = 24.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Color.Black,
+                    color = MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier.padding(vertical = 2.dp)
                 )
 
@@ -230,7 +228,7 @@ fun LoadingCard() {
             .height(200.dp),
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(
-            containerColor = Color.White.copy(alpha = 0.95f)
+            containerColor = MaterialTheme.colorScheme.surface
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
     ) {
@@ -240,7 +238,7 @@ fun LoadingCard() {
             verticalArrangement = Arrangement.Center
         ) {
             CircularProgressIndicator(
-                color = Color(0xFF667eea),
+                color = MaterialTheme.colorScheme.primary,
                 modifier = Modifier
                     .size(48.dp)
                     .alpha(alpha)
@@ -251,7 +249,7 @@ fun LoadingCard() {
             Text(
                 text = "正在获取传感器数据...",
                 fontSize = 16.sp,
-                color = Color.Gray,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.alpha(alpha)
             )
         }
@@ -266,7 +264,7 @@ fun ErrorCard(errorMessage: String, onRetry: () -> Unit) {
             .height(200.dp),
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(
-            containerColor = Color.White.copy(alpha = 0.95f)
+            containerColor = MaterialTheme.colorScheme.surface
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
     ) {
@@ -281,7 +279,7 @@ fun ErrorCard(errorMessage: String, onRetry: () -> Unit) {
                 text = "❌ 连接失败",
                 fontSize = 20.sp,
                 fontWeight = FontWeight.Bold,
-                color = Color(0xFFFF6B6B)
+                color = MaterialTheme.colorScheme.error
             )
 
             Spacer(modifier = Modifier.height(8.dp))
@@ -289,7 +287,7 @@ fun ErrorCard(errorMessage: String, onRetry: () -> Unit) {
             Text(
                 text = errorMessage,
                 fontSize = 14.sp,
-                color = Color.Gray,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center
             )
 
@@ -298,11 +296,11 @@ fun ErrorCard(errorMessage: String, onRetry: () -> Unit) {
             Button(
                 onClick = onRetry,
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFF667eea)
+                    containerColor = MaterialTheme.colorScheme.primary
                 ),
                 shape = RoundedCornerShape(12.dp)
             ) {
-                Text("重新连接", color = Color.White)
+                Text("重新连接", color = MaterialTheme.colorScheme.onPrimary)
             }
         }
     }
@@ -324,7 +322,8 @@ fun StatusIndicator(
         label = "scale"
     )
 
-    val statusColor = if (isUpdating) Color(0xFFFF9800) else Color(0xFF4CAF50)
+    val statusColor =
+        if (isUpdating) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.primary
     val statusText = if (isUpdating) "正在更新..." else "实时监控中"
 
     Row(
@@ -343,7 +342,6 @@ fun StatusIndicator(
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
                 text = statusText,
-                color = Color.White,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Medium
             )
@@ -355,7 +353,6 @@ fun StatusIndicator(
                 }
                 Text(
                     text = "更新时间: $updateTime",
-                    color = Color.White.copy(alpha = 0.7f),
                     fontSize = 12.sp,
                     modifier = Modifier.padding(top = 2.dp)
                 )

@@ -4,6 +4,7 @@ import com.example.thebest.data.model.SensorData
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
+import io.ktor.http.HttpStatusCode
 
 class ApiService(private val client: HttpClient) {
 
@@ -11,5 +12,20 @@ class ApiService(private val client: HttpClient) {
 
     suspend fun getSensorData(): SensorData {
         return client.get("$baseUrl/data").body()
+    }
+
+    suspend fun setThreshold(tempThreshold: Int, lightThreshold: Int): String {
+        return try {
+            val response =
+                client.get("$baseUrl/setThreshold?tempThreshold=$tempThreshold&lightThreshold=$lightThreshold")
+
+            if (response.status == HttpStatusCode.OK) {
+                "设置成功"
+            } else {
+                "设置失败: HTTP ${response.status.value}"
+            }
+        } catch (e: Exception) {
+            "设置失败: ${e.message}"
+        }
     }
 }
