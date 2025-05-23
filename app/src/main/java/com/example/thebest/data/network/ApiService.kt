@@ -16,16 +16,15 @@ class ApiService(private val client: HttpClient) {
 
     suspend fun setThreshold(tempThreshold: Int, lightThreshold: Int): String {
         return try {
-            val response =
-                client.get("$baseUrl/setThreshold?tempThreshold=$tempThreshold&lightThreshold=$lightThreshold")
+            val response = client.get("$baseUrl/setThreshold?tempThreshold=$tempThreshold&lightThreshold=$lightThreshold")
 
             if (response.status == HttpStatusCode.OK) {
                 "设置成功"
             } else {
-                "设置失败: HTTP ${response.status.value}"
+                throw Exception("HTTP ${response.status.value}")
             }
         } catch (e: Exception) {
-            "设置失败: ${e.message}"
+            throw e
         }
     }
 }

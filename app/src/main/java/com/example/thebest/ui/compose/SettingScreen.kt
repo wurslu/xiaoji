@@ -103,16 +103,15 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
             }
         }
 
-        // 全屏加载指示器
         if (uiState.isSaving) {
             LoadingOverlay()
         }
 
-        // 全屏结果提示
         if (uiState.saveMessage.isNotEmpty() && !uiState.isSaving) {
             ResultOverlay(
                 message = uiState.saveMessage,
-                isSuccess = uiState.saveSuccess
+                isSuccess = uiState.saveSuccess,
+                onDismiss = viewModel::clearSaveMessage
             )
         }
     }
@@ -160,8 +159,17 @@ fun LoadingOverlay() {
 @Composable
 fun ResultOverlay(
     message: String,
-    isSuccess: Boolean
+    isSuccess: Boolean,
+    onDismiss: () -> Unit
 ) {
+    LaunchedEffect(message, isSuccess) {
+        if (message.isNotEmpty()) {
+            val delayTime = if (isSuccess) 1500L else 3000L
+            kotlinx.coroutines.delay(delayTime)
+            onDismiss()
+        }
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -182,26 +190,31 @@ fun ResultOverlay(
                 modifier = Modifier.padding(32.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // 图标
+                // 强制显示图标和状态信息
                 Text(
                     text = if (isSuccess) "✅" else "❌",
                     fontSize = 48.sp
                 )
 
+                Spacer(modifier = Modifier.height(8.dp))
+
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // 消息
                 Text(
                     text = message,
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface,
+                    color = if (isSuccess)
+                        MaterialTheme.colorScheme.onSurface
+                    else
+                        MaterialTheme.colorScheme.error,
                     textAlign = TextAlign.Center
                 )
             }
         }
     }
 }
+
 
 @Composable
 fun TemperatureSettingCard(

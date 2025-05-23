@@ -7,7 +7,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.delay
 
 class SettingsViewModel(private val apiService: ApiService) : ViewModel() {
 
@@ -52,23 +51,25 @@ class SettingsViewModel(private val apiService: ApiService) : ViewModel() {
 
                 _uiState.value = _uiState.value.copy(
                     isSaving = false,
-                    saveMessage = "✅ $result",
+                    saveMessage = result,
                     saveSuccess = true
                 )
-
-                delay(3000)
-                _uiState.value = _uiState.value.copy(saveMessage = "")
 
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
                     isSaving = false,
-                    saveMessage = "❌ 设置失败: ${e.message}",
+                    saveMessage = "设置失败: ${e.message}",
                     saveSuccess = false
                 )
 
-                delay(5000)
-                _uiState.value = _uiState.value.copy(saveMessage = "")
             }
         }
+    }
+
+    fun clearSaveMessage() {
+        _uiState.value = _uiState.value.copy(
+            saveMessage = "",
+            saveSuccess = false
+        )
     }
 }
