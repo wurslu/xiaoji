@@ -264,8 +264,7 @@ fun LoadingCard() {
 fun ErrorCard(errorMessage: String, onRetry: () -> Unit) {
     Card(
         modifier = Modifier
-            .fillMaxWidth()
-            .height(200.dp),
+            .fillMaxWidth(),
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
