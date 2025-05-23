@@ -29,7 +29,6 @@ import com.example.thebest.ui.viewmodel.SettingsViewModel
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
         val httpClient = NetworkModule.provideHttpClient()
         val apiService = NetworkModule.provideApiService(httpClient)
         val repository = SensorRepository(apiService)

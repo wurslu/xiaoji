@@ -41,11 +41,10 @@ fun SensorScreen(viewModel: MainViewModel) {
         }
     }
 
-    // 更温和的渐变背景 - 与底部导航栏更协调
     val gradientColors = listOf(
-        MaterialTheme.colorScheme.background,
+        MaterialTheme.colorScheme.surfaceVariant,
         MaterialTheme.colorScheme.surface,
-        MaterialTheme.colorScheme.surfaceVariant
+        MaterialTheme.colorScheme.background,
     )
 
     Box(
