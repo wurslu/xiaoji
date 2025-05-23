@@ -6,5 +6,6 @@ import kotlinx.serialization.Serializable
 data class SensorData(
     val temperature: Double,
     val humidity: Double,
-    val light: Int
+    val light: Int,
+    val soil: Int
 )

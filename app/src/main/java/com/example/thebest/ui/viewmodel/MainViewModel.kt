@@ -46,7 +46,6 @@ class MainViewModel(private val repository: SensorRepository) : ViewModel() {
 
     fun refreshDataSilently() {
         viewModelScope.launch {
-            // 静默刷新：如果已有数据，不显示加载状态
             val shouldShowLoading = _uiState.value.sensorData == null
 
             if (shouldShowLoading) {

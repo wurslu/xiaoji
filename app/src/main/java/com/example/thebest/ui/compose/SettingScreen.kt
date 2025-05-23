@@ -2,7 +2,9 @@ package com.example.thebest.ui.compose
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DeviceThermostat
 import androidx.compose.material.icons.filled.WbSunny
@@ -11,7 +13,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -25,23 +26,14 @@ import com.example.thebest.ui.viewmodel.SettingsViewModel
 fun SettingsScreen(viewModel: SettingsViewModel) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
-    // 更温和的渐变背景 - 与底部导航栏更协调
-    val gradientColors = listOf(
-        MaterialTheme.colorScheme.surfaceVariant,
-        MaterialTheme.colorScheme.surface,
-        MaterialTheme.colorScheme.background,
-        )
-
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(
-                brush = Brush.verticalGradient(gradientColors)
-            )
     ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .verticalScroll(rememberScrollState()) // 添加垂直滚动
                 .padding(20.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
@@ -49,7 +41,7 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
             Spacer(modifier = Modifier.height(40.dp))
 
             Text(
-                text = "数据阈值设置",
+                text = "传感器设置",
                 fontSize = 28.sp,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onBackground,
@@ -101,9 +93,13 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                     Text(
                         text = "更新阈值",
                         fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1
                     )
                 }
+
+                // 添加底部间距，确保按钮不被导航栏遮挡
+                Spacer(modifier = Modifier.height(100.dp))
             }
         }
 

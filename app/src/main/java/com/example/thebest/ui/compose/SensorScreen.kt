@@ -2,8 +2,20 @@ package com.example.thebest.ui.compose
 
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DeviceThermostat
 import androidx.compose.material.icons.filled.WaterDrop
@@ -14,7 +26,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
@@ -29,49 +40,37 @@ import kotlinx.coroutines.delay
 @Composable
 fun SensorScreen(viewModel: MainViewModel) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-
-    // 自动获取数据
     LaunchedEffect(Unit) {
-        // 第一次获取数据
         viewModel.fetchSensorData()
-        // 每5秒静默刷新一次
         while (true) {
             delay(5000)
-            viewModel.refreshDataSilently() // 使用静默刷新
+            viewModel.refreshDataSilently()
         }
     }
-
-    val gradientColors = listOf(
-        MaterialTheme.colorScheme.surfaceVariant,
-        MaterialTheme.colorScheme.surface,
-        MaterialTheme.colorScheme.background,
-    )
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(
-                brush = Brush.verticalGradient(gradientColors)
-            )
+
     ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .verticalScroll(rememberScrollState())
                 .padding(20.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // 标题区域
             Spacer(modifier = Modifier.height(40.dp))
 
             Text(
-                text = "大鹏环境",
+                text = "智能传感器监控",
                 fontSize = 28.sp,
                 fontWeight = FontWeight.Bold,
                 textAlign = TextAlign.Center
             )
 
             Text(
-                text = "实时数据监测",
+                text = "实时环境数据监测",
                 fontSize = 16.sp,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.padding(top = 8.dp)
@@ -81,14 +80,12 @@ fun SensorScreen(viewModel: MainViewModel) {
 
             when {
                 uiState.isLoading && uiState.sensorData == null -> {
-                    // 只在第一次加载或没有数据时显示加载界面
                     LoadingCard()
                 }
 
                 uiState.sensorData != null -> {
                     val data = uiState.sensorData!!
 
-                    // 传感器数据卡片
                     Column(
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
@@ -102,7 +99,7 @@ fun SensorScreen(viewModel: MainViewModel) {
 
                         SensorCard(
                             icon = Icons.Default.WaterDrop,
-                            title = "湿度",
+                            title = "空气湿度",
                             value = "${data.humidity}%",
                             color = MaterialTheme.colorScheme.tertiary,
                             subtitle = getHumidityStatus(data.humidity)
@@ -115,15 +112,24 @@ fun SensorScreen(viewModel: MainViewModel) {
                             color = MaterialTheme.colorScheme.secondary,
                             subtitle = getLightStatus(data.light)
                         )
+
+                        SensorCard(
+                            icon = Icons.Default.WaterDrop,
+                            title = "土壤湿度",
+                            value = "${data.soil}",
+                            color = MaterialTheme.colorScheme.primary,
+                            subtitle = getSoilStatus(data.soil)
+                        )
                     }
 
                     Spacer(modifier = Modifier.height(24.dp))
 
-                    // 状态指示器 - 显示更新状态
                     StatusIndicator(
                         isUpdating = uiState.isLoading,
                         lastUpdateTime = uiState.lastUpdateTime
                     )
+
+                    Spacer(modifier = Modifier.height(100.dp))
                 }
 
                 uiState.errorMessage != null -> {
@@ -146,8 +152,7 @@ fun SensorCard(
 ) {
     Card(
         modifier = Modifier
-            .fillMaxWidth()
-            .height(120.dp),
+            .fillMaxWidth(),
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
@@ -160,7 +165,6 @@ fun SensorCard(
                 .padding(20.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // 图标区域
             Box(
                 modifier = Modifier
                     .size(60.dp)
@@ -178,13 +182,12 @@ fun SensorCard(
 
             Spacer(modifier = Modifier.width(20.dp))
 
-            // 文字区域
             Column(
                 modifier = Modifier.weight(1f)
             ) {
                 Text(
                     text = title,
-                    style = MaterialTheme.typography.titleMedium,
+                    fontSize = 16.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontWeight = FontWeight.Medium
                 )
@@ -380,7 +383,15 @@ fun getHumidityStatus(humidity: Double): String {
 fun getLightStatus(light: Int): String {
     return when {
         light < 200 -> "昏暗"
-        light > 1000 -> "强光"
+        light > 700 -> "强光"
         else -> "适中"
+    }
+}
+
+fun getSoilStatus(soil: Int): String {
+    return when (soil) {
+        0 -> "干燥"
+        1 -> "湿润"
+        else -> "未知"
     }
 }

@@ -49,7 +49,6 @@ fun MainApp(
 ) {
     val navController = rememberNavController()
 
-    // 导航项目
     val items = listOf(
         NavigationItem(
             title = "监控",

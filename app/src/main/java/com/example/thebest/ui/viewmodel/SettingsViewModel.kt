@@ -56,7 +56,6 @@ class SettingsViewModel(private val apiService: ApiService) : ViewModel() {
                     saveSuccess = true
                 )
 
-                // 3秒后清除消息
                 delay(3000)
                 _uiState.value = _uiState.value.copy(saveMessage = "")
 
@@ -67,7 +66,6 @@ class SettingsViewModel(private val apiService: ApiService) : ViewModel() {
                     saveSuccess = false
                 )
 
-                // 5秒后清除错误消息
                 delay(5000)
                 _uiState.value = _uiState.value.copy(saveMessage = "")
             }
