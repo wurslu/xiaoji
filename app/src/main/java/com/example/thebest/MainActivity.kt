@@ -1,6 +1,7 @@
 package com.example.thebest
 
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.padding
@@ -32,10 +33,17 @@ import com.example.thebest.ui.theme.TheBestTheme
 import com.example.thebest.ui.viewmodel.HistoryViewModel
 import com.example.thebest.ui.viewmodel.MainViewModel
 import com.example.thebest.ui.viewmodel.SettingsViewModel
+import com.example.thebest.utils.NotificationPermissionManager
 
 class MainActivity : ComponentActivity() {
+
+    private lateinit var notificationPermissionManager: NotificationPermissionManager
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // 初始化通知权限管理器
+        notificationPermissionManager = NotificationPermissionManager(this)
 
         // 网络模块
         val httpClient = NetworkModule.provideHttpClient()
@@ -49,6 +57,19 @@ class MainActivity : ComponentActivity() {
         setContent {
             TheBestTheme {
                 MainApp(repository, apiService, this@MainActivity)
+            }
+        }
+
+        // 应用启动后立即检查并请求通知权限
+        checkNotificationPermission()
+    }
+
+    private fun checkNotificationPermission() {
+        notificationPermissionManager.checkAndRequestPermission { isGranted ->
+            if (!isGranted) {
+                // 只在权限被拒绝时显示提示
+                Toast.makeText(this, "通知权限被拒绝，可能无法接收环境异常提醒", Toast.LENGTH_LONG)
+                    .show()
             }
         }
     }
