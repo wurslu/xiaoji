@@ -207,7 +207,7 @@ fun TemperatureSettingCard(
         color = MaterialTheme.colorScheme.error
     ) {
         SliderSetting(
-            label = "温度阈值",
+            label = "大于设定阈值时，温控系统启动",
             value = tempThreshold,
             onValueChange = onTempThresholdChange,
             valueRange = 0..50,
@@ -227,7 +227,7 @@ fun LightSettingCard(
         color = MaterialTheme.colorScheme.secondary
     ) {
         SliderSetting(
-            label = "光强阈值",
+            label = "小于设定阈值时，补光系统启动",
             value = lightThreshold,
             onValueChange = onLightThresholdChange,
             valueRange = 0..1000,
