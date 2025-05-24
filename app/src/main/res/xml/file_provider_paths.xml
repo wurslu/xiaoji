@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- 外部文件目录，用于导出数据 -->
+    <external-files-path
+        name="sensor_exports"
+        path="sensor_exports/" />
+
+    <!-- 缓存目录，临时文件 -->
+    <cache-path
+        name="cache"
+        path="." />
+
+    <!-- 外部缓存目录 -->
+    <external-cache-path
+        name="external_cache"
+        path="." />
+</paths>

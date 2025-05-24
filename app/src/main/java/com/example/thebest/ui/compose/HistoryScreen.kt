@@ -30,6 +30,8 @@ fun HistoryScreen(
     onNavigateToDetail: (HistoryViewModel.DateRange) -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    var showExportDialog by remember { mutableStateOf(false) }
+    var showResultSnackbar by remember { mutableStateOf<Pair<Boolean, String>?>(null) }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -134,6 +136,27 @@ fun HistoryScreen(
 
         item {
             Spacer(modifier = Modifier.height(20.dp))
+
+            // 导出数据按钮
+            if (uiState.recordCount > 0) {
+                Button(
+                    onClick = { showExportDialog = true },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.secondary
+                    ),
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !uiState.isLoading,
+                    shape = RoundedCornerShape(16.dp)
+                ) {
+                    Icon(Icons.Default.FileDownload, contentDescription = null)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("导出全部数据")
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+            }
+
+            // 清除数据按钮
             Button(
                 onClick = { viewModel.clearAllRecords() },
                 colors = ButtonDefaults.buttonColors(
@@ -192,8 +215,79 @@ fun HistoryScreen(
             Spacer(modifier = Modifier.height(32.dp))
         }
     }
-}
 
+    // 导出对话框
+    if (showExportDialog) {
+        // 这里需要获取所有记录用于导出
+        LaunchedEffect(showExportDialog) {
+            // 触发获取全部记录
+            viewModel.selectDateRange(HistoryViewModel.DateRange.ALL)
+        }
+
+        ExportDataDialog(
+            records = uiState.records,
+            onDismiss = { showExportDialog = false },
+            onExportComplete = { success, message ->
+                showExportDialog = false
+                showResultSnackbar = Pair(success, message)
+            }
+        )
+    }
+
+    // 结果提示
+    showResultSnackbar?.let { (success, message) ->
+        LaunchedEffect(showResultSnackbar) {
+            kotlinx.coroutines.delay(3000)
+            showResultSnackbar = null
+        }
+
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.BottomCenter
+        ) {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = if (success)
+                        MaterialTheme.colorScheme.primaryContainer
+                    else
+                        MaterialTheme.colorScheme.errorContainer
+                ),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Row(
+                    modifier = Modifier.padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = if (success) Icons.Default.CheckCircle else Icons.Default.Error,
+                        contentDescription = null,
+                        tint = if (success)
+                            MaterialTheme.colorScheme.onPrimaryContainer
+                        else
+                            MaterialTheme.colorScheme.onErrorContainer
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text(
+                        text = message,
+                        color = if (success)
+                            MaterialTheme.colorScheme.onPrimaryContainer
+                        else
+                            MaterialTheme.colorScheme.onErrorContainer,
+                        modifier = Modifier.weight(1f)
+                    )
+                    TextButton(
+                        onClick = { showResultSnackbar = null }
+                    ) {
+                        Text("确定")
+                    }
+                }
+            }
+        }
+    }
+}
 
 @Composable
 fun HistoryRangeCard(
@@ -270,6 +364,8 @@ fun HistoryDetailScreen(
     onBack: () -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    var showExportDialog by remember { mutableStateOf(false) }
+    var showResultSnackbar by remember { mutableStateOf<Pair<Boolean, String>?>(null) }
 
     LaunchedEffect(selectedRange) {
         viewModel.selectDateRange(selectedRange)
@@ -317,6 +413,20 @@ fun HistoryDetailScreen(
                         fontSize = 14.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                }
+
+                // 导出按钮
+                if (uiState.records.isNotEmpty()) {
+                    IconButton(
+                        onClick = { showExportDialog = true },
+                        enabled = !uiState.isLoading
+                    ) {
+                        Icon(
+                            Icons.Default.FileDownload,
+                            contentDescription = "导出数据",
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
                 }
 
                 // 实时更新指示器
@@ -441,6 +551,72 @@ fun HistoryDetailScreen(
                     // 底部间距
                     item {
                         Spacer(modifier = Modifier.height(32.dp))
+                    }
+                }
+            }
+        }
+    }
+
+    // 导出对话框
+    if (showExportDialog) {
+        ExportDataDialog(
+            records = uiState.records,
+            onDismiss = { showExportDialog = false },
+            onExportComplete = { success, message ->
+                showExportDialog = false
+                showResultSnackbar = Pair(success, message)
+            }
+        )
+    }
+
+    // 结果提示
+    showResultSnackbar?.let { (success, message) ->
+        LaunchedEffect(showResultSnackbar) {
+            kotlinx.coroutines.delay(3000)
+            showResultSnackbar = null
+        }
+
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.BottomCenter
+        ) {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = if (success)
+                        MaterialTheme.colorScheme.primaryContainer
+                    else
+                        MaterialTheme.colorScheme.errorContainer
+                ),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Row(
+                    modifier = Modifier.padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = if (success) Icons.Default.CheckCircle else Icons.Default.Error,
+                        contentDescription = null,
+                        tint = if (success)
+                            MaterialTheme.colorScheme.onPrimaryContainer
+                        else
+                            MaterialTheme.colorScheme.onErrorContainer
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text(
+                        text = message,
+                        color = if (success)
+                            MaterialTheme.colorScheme.onPrimaryContainer
+                        else
+                            MaterialTheme.colorScheme.onErrorContainer,
+                        modifier = Modifier.weight(1f)
+                    )
+                    TextButton(
+                        onClick = { showResultSnackbar = null }
+                    ) {
+                        Text("确定")
                     }
                 }
             }
