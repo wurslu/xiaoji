@@ -308,14 +308,17 @@ fun SliderSetting(
         ) {
             Text(
                 text = label,
-                fontSize = 16.sp,
+                style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                fontWeight = FontWeight.Medium
+                fontWeight = FontWeight.Medium,
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(end = 16.dp)
             )
 
             Text(
                 text = "$value$unit",
-                fontSize = 16.sp,
+                style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurface,
                 fontWeight = FontWeight.Bold
             )
