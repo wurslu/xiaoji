@@ -2,6 +2,7 @@ package com.example.thebest.ui.compose
 
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -10,6 +11,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -30,29 +32,59 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.thebest.ui.viewmodel.MainViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SensorScreen(viewModel: MainViewModel) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val scrollState = rememberScrollState()
+    val coroutineScope = rememberCoroutineScope()
+
+    // 下拉刷新状态
+    var isRefreshing by remember { mutableStateOf(false) }
+    var pullOffset by remember { mutableFloatStateOf(0f) }
+    val refreshThreshold = with(LocalDensity.current) { 80.dp.toPx() }
+
+    // 动画状态
+    val offsetY by animateFloatAsState(
+        targetValue = if (isRefreshing) refreshThreshold else pullOffset,
+        animationSpec = tween(300),
+        label = "offsetY"
+    )
+
+    // 刷新动画
+    val refreshRotation by animateFloatAsState(
+        targetValue = if (isRefreshing) 360f else 0f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1000, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "refreshRotation"
+    )
 
     LaunchedEffect(Unit) {
         // 首次获取数据（带保存）
         viewModel.fetchSensorData()
 
+        // 协程1：每2秒刷新数据显示
         launch {
             delay(2_000)
             while (true) {
-                if (!viewModel.isCurrentlyLoading()) {
+                if (!viewModel.isCurrentlyLoading() && !isRefreshing) {
                     viewModel.refreshDataOnly()
                 }
                 delay(2_000)
@@ -69,11 +101,96 @@ fun SensorScreen(viewModel: MainViewModel) {
         }
     }
 
-    Box(modifier = Modifier.fillMaxSize()) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .pointerInput(Unit) {
+                detectDragGestures(
+                    onDragEnd = {
+                        if (pullOffset >= refreshThreshold && !isRefreshing) {
+                            // 触发刷新
+                            isRefreshing = true
+                            coroutineScope.launch {
+                                viewModel.fetchSensorData()
+
+                                // 等待刷新完成
+                                while (viewModel.isCurrentlyLoading()) {
+                                    delay(100)
+                                }
+
+                                // 额外延时确保动画完整性
+                                delay(500)
+                                isRefreshing = false
+                                pullOffset = 0f
+                            }
+                        } else {
+                            pullOffset = 0f
+                        }
+                    }
+                ) { _, dragAmount ->
+                    // 只有在滚动到顶部时才允许下拉
+                    if (scrollState.value == 0 && dragAmount.y > 0) {
+                        pullOffset =
+                            (pullOffset + dragAmount.y).coerceAtMost(refreshThreshold * 1.5f)
+                    }
+                }
+            }
+    ) {
+        // 下拉刷新指示器
+        if (offsetY > 0 || isRefreshing) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .offset { IntOffset(0, (offsetY - refreshThreshold).roundToInt()) }
+                    .padding(16.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Card(
+                    shape = RoundedCornerShape(50.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surface
+                    ),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Refresh,
+                            contentDescription = "刷新",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier
+                                .size(20.dp)
+                                .then(
+                                    if (isRefreshing) {
+                                        Modifier.graphicsLayer {
+                                            rotationZ = refreshRotation
+                                        }
+                                    } else Modifier
+                                )
+                        )
+
+                        if (isRefreshing || pullOffset >= refreshThreshold) {
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = if (isRefreshing) "刷新中..." else "松开刷新",
+                                fontSize = 14.sp,
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        // 主内容
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .verticalScroll(rememberScrollState())
+                .offset { IntOffset(0, offsetY.roundToInt()) }
+                .verticalScroll(scrollState)
                 .padding(20.dp)
         ) {
             // 简化的标题区域
@@ -131,6 +248,7 @@ fun SensorScreen(viewModel: MainViewModel) {
                         isLoading = uiState.isLoading,
                         lastUpdateTime = uiState.lastUpdateTime,
                         lastSaveTime = uiState.lastSaveTime,
+                        isRefreshing = isRefreshing
                     )
 
                     Spacer(modifier = Modifier.height(100.dp))
@@ -168,6 +286,7 @@ fun StatusIndicator(
     isLoading: Boolean = false,
     lastUpdateTime: Long = 0L,
     lastSaveTime: Long = 0L,
+    isRefreshing: Boolean = false
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -179,8 +298,8 @@ fun StatusIndicator(
         Column(
             modifier = Modifier.padding(16.dp)
         ) {
-            // 如果正在加载，显示加载指示
-            if (isLoading) {
+            // 如果正在加载或刷新，显示加载指示
+            if (isLoading || isRefreshing) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.Center,
@@ -193,7 +312,7 @@ fun StatusIndicator(
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = "正在更新数据...",
+                        text = if (isRefreshing) "手动刷新中..." else "正在更新数据...",
                         fontSize = 11.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
