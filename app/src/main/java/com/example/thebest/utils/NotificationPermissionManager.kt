@@ -6,6 +6,7 @@ import android.content.pm.PackageManager
 import android.os.Build
 import androidx.activity.ComponentActivity
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 
 class NotificationPermissionManager(private val activity: ComponentActivity) {
@@ -30,8 +31,8 @@ class NotificationPermissionManager(private val activity: ComponentActivity) {
                 Manifest.permission.POST_NOTIFICATIONS
             ) == PackageManager.PERMISSION_GRANTED
         } else {
-            // Android 13 以下版本不需要运行时权限
-            true
+            // Android 13 以下版本默认有权限，但还需要检查通知是否被用户关闭
+            NotificationManagerCompat.from(activity).areNotificationsEnabled()
         }
     }
 
@@ -48,7 +49,8 @@ class NotificationPermissionManager(private val activity: ComponentActivity) {
             onPermissionResult = callback
             requestPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
         } else {
-            callback(true)
+            // Android 13 以下，检查通知是否启用
+            callback(NotificationManagerCompat.from(activity).areNotificationsEnabled())
         }
     }
 
@@ -65,7 +67,7 @@ class NotificationPermissionManager(private val activity: ComponentActivity) {
 
     companion object {
         /**
-         * 检查通知权限（静态方法）
+         * 检查通知权限（静态方法）- 修复版本
          */
         fun hasPermission(context: Context): Boolean {
             return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -74,7 +76,8 @@ class NotificationPermissionManager(private val activity: ComponentActivity) {
                     Manifest.permission.POST_NOTIFICATIONS
                 ) == PackageManager.PERMISSION_GRANTED
             } else {
-                true
+                // Android 13 以下也要检查用户是否禁用了通知
+                NotificationManagerCompat.from(context).areNotificationsEnabled()
             }
         }
     }

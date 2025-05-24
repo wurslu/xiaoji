@@ -1,5 +1,13 @@
 package com.example.thebest.ui.compose
 
+// 在相关文件顶部添加
+import android.Manifest
+import android.content.Intent
+import android.os.Build
+import android.provider.Settings
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
@@ -9,13 +17,13 @@ import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.example.thebest.MainActivity
 import com.example.thebest.ui.viewmodel.SettingsViewModel
 import com.example.thebest.utils.NotificationPermissionManager
 
@@ -33,6 +41,21 @@ fun NotificationSettingsScreen(
     val context = LocalContext.current
     var hasNotificationPermission by remember {
         mutableStateOf(NotificationPermissionManager.hasPermission(context))
+    }
+
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        hasNotificationPermission = isGranted
+        if (isGranted) {
+            // 权限获得后，可以考虑自动开启监控
+            viewModel.updateMonitoringEnabled(true)
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        // 每次进入页面时重新检查权限状态
+        hasNotificationPermission = NotificationPermissionManager.hasPermission(context)
     }
 
     Column(
@@ -78,30 +101,46 @@ fun NotificationSettingsScreen(
             contentPadding = PaddingValues(20.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // 通知权限状态卡片
+            // 通知权限状态卡片 - 调试版本
             item {
                 NotificationPermissionCard(
                     hasPermission = hasNotificationPermission,
                     onRequestPermission = {
-                        if (context is MainActivity) {
-                            val permissionManager = NotificationPermissionManager(context)
-                            permissionManager.requestNotificationPermission { granted ->
-                                hasNotificationPermission = granted
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                            // 调试：添加日志
+                            println("尝试申请通知权限")
+                            permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                        } else {
+                            // Android 13以下，引导用户到系统设置
+                            try {
+                                val intent = Intent().apply {
+                                    action = Settings.ACTION_APP_NOTIFICATION_SETTINGS
+                                    putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+                                }
+                                context.startActivity(intent)
+                            } catch (e: Exception) {
+                                // 如果无法打开设置，显示提示
+                                Toast.makeText(
+                                    context,
+                                    "请在系统设置中开启通知权限",
+                                    Toast.LENGTH_LONG
+                                ).show()
                             }
                         }
                     }
                 )
             }
 
-            // 通知总开关
+            // 通知总开关 - 根据权限状态动态调整
             item {
                 NotificationToggleCard(
                     title = "启用通知监控",
                     subtitle = if (hasNotificationPermission)
                         "开启后将在环境异常时发送通知"
                     else
-                        "需要先授权通知权限",
-                    isEnabled = monitoringState?.isMonitoringEnabled != false && hasNotificationPermission,
+                        "需要先授权通知权限才能启用监控",
+                    isEnabled = hasNotificationPermission && (monitoringState?.isMonitoringEnabled == true),
+                    canToggle = hasNotificationPermission, // 新增参数控制是否可以切换
                     onToggle = { enabled ->
                         if (hasNotificationPermission) {
                             viewModel.updateMonitoringEnabled(enabled)
@@ -110,7 +149,7 @@ fun NotificationSettingsScreen(
                 )
             }
 
-            // 静音时段设置
+            // 只有在权限授权且监控开启时才显示其他设置
             if (hasNotificationPermission && monitoringState?.isMonitoringEnabled == true) {
                 item {
                     QuietHoursCard(
@@ -120,17 +159,12 @@ fun NotificationSettingsScreen(
                         }
                     )
                 }
-            }
 
-            // 通知类型信息展示（替代无用的开关）
-            if (hasNotificationPermission && monitoringState?.isMonitoringEnabled == true) {
                 item {
                     NotificationTypesInfoCard()
                 }
-            }
 
-            // 通知历史
-            if (hasNotificationPermission && monitoringState?.isMonitoringEnabled == true) {
+                // 通知历史
                 item {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -283,12 +317,12 @@ fun NotificationPermissionCard(
     }
 }
 
-// 其他现有的 Composable 函数保持不变...
 @Composable
 fun NotificationToggleCard(
     title: String,
     subtitle: String,
     isEnabled: Boolean,
+    canToggle: Boolean = true, // 新增参数
     onToggle: (Boolean) -> Unit
 ) {
     Card(
@@ -296,7 +330,8 @@ fun NotificationToggleCard(
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
         ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        shape = RoundedCornerShape(16.dp)
     ) {
         Row(
             modifier = Modifier
@@ -320,7 +355,7 @@ fun NotificationToggleCard(
                     text = title,
                     style = MaterialTheme.typography.bodyLarge,
                     fontWeight = FontWeight.Medium,
-                    color = MaterialTheme.colorScheme.onSurface
+                    color = if (canToggle) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Text(
                     text = subtitle,
@@ -332,7 +367,8 @@ fun NotificationToggleCard(
 
             Switch(
                 checked = isEnabled,
-                onCheckedChange = onToggle
+                onCheckedChange = onToggle,
+                enabled = canToggle // 根据权限状态控制是否可用
             )
         }
     }

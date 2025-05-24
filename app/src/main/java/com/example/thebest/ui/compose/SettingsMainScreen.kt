@@ -13,10 +13,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.thebest.ui.viewmodel.SettingsViewModel
+import com.example.thebest.utils.NotificationPermissionManager
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -30,6 +32,12 @@ fun SettingsMainScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val monitoringState by viewModel.monitoringState?.collectAsStateWithLifecycle() ?: remember {
         mutableStateOf(null)
+    }
+
+    // 实时检查通知权限状态
+    val context = LocalContext.current
+    val hasNotificationPermission by remember {
+        derivedStateOf { NotificationPermissionManager.hasPermission(context) }
     }
 
     LazyColumn(
@@ -64,7 +72,15 @@ fun SettingsMainScreen(
                 },
                 subtitle = when (setting.key) {
                     "thresholds" -> "温度 ${uiState.temperatureThreshold}°C • 光照 ${uiState.lightThreshold}"
-                    "notifications" -> if (monitoringState?.isMonitoringEnabled == true) "已开启" else "已关闭"
+                    "notifications" -> {
+                        // 修复：正确显示通知状态
+                        when {
+                            !hasNotificationPermission -> "需要权限"
+                            monitoringState?.isMonitoringEnabled == true -> "已开启"
+                            else -> "已关闭"
+                        }
+                    }
+
                     else -> setting.subtitle
                 }
             )
