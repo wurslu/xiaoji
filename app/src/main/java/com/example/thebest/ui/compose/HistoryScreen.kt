@@ -281,7 +281,6 @@ fun HistoryDetailScreen(
         Surface(
             modifier = Modifier.fillMaxWidth(),
             color = MaterialTheme.colorScheme.surface,
-            shadowElevation = 2.dp
         ) {
             Row(
                 modifier = Modifier
@@ -423,7 +422,6 @@ fun HistoryRecordCard(record: SensorRecord) {
         Column(
             modifier = Modifier.padding(16.dp)
         ) {
-            // 时间戳
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -436,16 +434,10 @@ fun HistoryRecordCard(record: SensorRecord) {
                     color = MaterialTheme.colorScheme.primary
                 )
 
-                Text(
-                    text = "#${record.id}",
-                    fontSize = 12.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
             }
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // 传感器数据
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceEvenly
