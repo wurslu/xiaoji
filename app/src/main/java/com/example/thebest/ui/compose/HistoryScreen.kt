@@ -52,7 +52,7 @@ fun HistoryScreen(
             )
         ) {
             Row(
-                modifier = Modifier.padding(20.dp),
+                modifier = Modifier.fillMaxWidth().padding(20.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -254,23 +254,22 @@ fun HistoryDetailScreen(
     Column(
         modifier = Modifier.fillMaxSize().scrollable(state = rememberScrollState(), orientation = Orientation.Vertical)
     ) {
-        // 顶部导航栏
-        Card(
+        // 顶部导航栏 - 简化样式
+        Surface(
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(bottomStart = 0.dp, bottomEnd = 0.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surface
-            ),
-            elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+            color = MaterialTheme.colorScheme.surface,
+            shadowElevation = 2.dp
         ) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(16.dp),
+                    .statusBarsPadding()
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(
-                    onClick = onBack
+                    onClick = onBack,
+                    modifier = Modifier.size(40.dp)
                 ) {
                     Icon(
                         Icons.Filled.ArrowBackIosNew,
@@ -279,9 +278,11 @@ fun HistoryDetailScreen(
                     )
                 }
 
-                Spacer(modifier = Modifier.width(8.dp))
+                Spacer(modifier = Modifier.width(12.dp))
 
-                Column {
+                Column(
+                    modifier = Modifier.weight(1f)
+                ) {
                     Text(
                         text = selectedRange.displayName,
                         fontSize = 20.sp,
@@ -290,17 +291,15 @@ fun HistoryDetailScreen(
                     )
                     Text(
                         text = "${uiState.records.size} 条记录",
-                        fontSize = 12.sp,
+                        fontSize = 14.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
 
-                Spacer(modifier = Modifier.weight(1f))
-
                 // 实时更新指示器
                 if (uiState.isLoading) {
                     CircularProgressIndicator(
-                        modifier = Modifier.size(20.dp),
+                        modifier = Modifier.size(24.dp),
                         strokeWidth = 2.dp,
                         color = MaterialTheme.colorScheme.primary
                     )
