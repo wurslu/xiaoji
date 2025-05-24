@@ -1,13 +1,12 @@
 package com.example.thebest.ui.compose
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.Orientation
-import androidx.compose.foundation.gestures.scrollable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -52,7 +51,9 @@ fun HistoryScreen(
             )
         ) {
             Row(
-                modifier = Modifier.fillMaxWidth().padding(20.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(20.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -100,7 +101,8 @@ fun HistoryScreen(
 
         // 时间范围选择卡片
         Column(
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier.verticalScroll(rememberScrollState())
         ) {
             HistoryViewModel.DateRange.entries.forEach { range ->
                 HistoryRangeCard(
@@ -252,7 +254,7 @@ fun HistoryDetailScreen(
     }
 
     Column(
-        modifier = Modifier.fillMaxSize().scrollable(state = rememberScrollState(), orientation = Orientation.Vertical)
+        modifier = Modifier.fillMaxSize()
     ) {
         // 顶部导航栏 - 简化样式
         Surface(
