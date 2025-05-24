@@ -4,9 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -32,142 +30,151 @@ fun HistoryScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(20.dp)
+    // 使用LazyColumn替代Column + verticalScroll
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(20.dp),
+        verticalArrangement = Arrangement.spacedBy(0.dp)
     ) {
         // 页面标题
-        PageHeader(title = "历史数据")
-
-        Spacer(modifier = Modifier.height(32.dp))
+        item {
+            PageHeader(title = "历史数据")
+            Spacer(modifier = Modifier.height(32.dp))
+        }
 
         // 数据统计卡片
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.primaryContainer
-            )
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(20.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer
+                )
             ) {
-                Column {
-                    Text(
-                        text = "总记录数",
-                        fontSize = 14.sp,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
-                    )
-                    Text(
-                        text = "${uiState.recordCount} 条",
-                        fontSize = 24.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer
-                    )
-                }
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(20.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text(
+                            text = "总记录数",
+                            fontSize = 14.sp,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
+                        )
+                        Text(
+                            text = "${uiState.recordCount} 条",
+                            fontSize = 24.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                    }
 
-                if (uiState.isLoading) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(20.dp),
-                        strokeWidth = 2.dp,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer
-                    )
-                } else {
-                    Icon(
-                        Icons.Default.Assessment,
-                        contentDescription = null,
-                        modifier = Modifier.size(32.dp),
-                        tint = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
-                    )
+                    if (uiState.isLoading) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp),
+                            strokeWidth = 2.dp,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                    } else {
+                        Icon(
+                            Icons.Default.Assessment,
+                            contentDescription = null,
+                            modifier = Modifier.size(32.dp),
+                            tint = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
+                        )
+                    }
                 }
             }
+            Spacer(modifier = Modifier.height(24.dp))
         }
-
-        Spacer(modifier = Modifier.height(24.dp))
 
         // 时间范围选择说明
-        Text(
-            text = "选择时间范围查看数据",
-            fontSize = 16.sp,
-            fontWeight = FontWeight.Medium,
-            color = MaterialTheme.colorScheme.onBackground,
-            modifier = Modifier.padding(bottom = 16.dp)
-        )
-
-        // 时间范围选择卡片
-        Column(
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-            modifier = Modifier.verticalScroll(rememberScrollState())
-        ) {
-            HistoryViewModel.DateRange.entries.forEach { range ->
-                HistoryRangeCard(
-                    range = range,
-                    recordCount = getRecordCountForRange(range, uiState),
-                    onClick = {
-                        onNavigateToDetail(range)
-                    }
-                )
-            }
+        item {
+            Text(
+                text = "选择时间范围查看数据",
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.onBackground,
+                modifier = Modifier.padding(bottom = 16.dp)
+            )
         }
 
-        Spacer(modifier = Modifier.height(32.dp))
+        // 时间范围选择卡片 - 使用items而不是嵌套滚动
+        items(HistoryViewModel.DateRange.entries) { range ->
+            HistoryRangeCard(
+                range = range,
+                recordCount = getRecordCountForRange(range, uiState),
+                onClick = {
+                    onNavigateToDetail(range)
+                }
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+        }
 
         // 清除数据按钮
-        Button(
-            onClick = { viewModel.clearAllRecords() },
-            colors = ButtonDefaults.buttonColors(
-                containerColor = MaterialTheme.colorScheme.error
-            ),
-            modifier = Modifier.fillMaxWidth(),
-            enabled = !uiState.isLoading && uiState.recordCount > 0,
-            shape = RoundedCornerShape(16.dp)
-        ) {
-            if (uiState.isLoading) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(16.dp),
-                    strokeWidth = 2.dp,
-                    color = MaterialTheme.colorScheme.onError
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("清除中...")
-            } else {
-                Icon(Icons.Default.Delete, contentDescription = null)
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("清除所有历史数据")
+        item {
+            Spacer(modifier = Modifier.height(20.dp))
+            Button(
+                onClick = { viewModel.clearAllRecords() },
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.error
+                ),
+                modifier = Modifier.fillMaxWidth(),
+                enabled = !uiState.isLoading && uiState.recordCount > 0,
+                shape = RoundedCornerShape(16.dp)
+            ) {
+                if (uiState.isLoading) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(16.dp),
+                        strokeWidth = 2.dp,
+                        color = MaterialTheme.colorScheme.onError
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("清除中...")
+                } else {
+                    Icon(Icons.Default.Delete, contentDescription = null)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("清除所有历史数据")
+                }
             }
         }
 
         // 错误信息显示
         if (uiState.errorMessage != null) {
-            Spacer(modifier = Modifier.height(16.dp))
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.errorContainer
-                ),
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Row(
-                    modifier = Modifier.padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically
+            item {
+                Spacer(modifier = Modifier.height(16.dp))
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.errorContainer
+                    ),
+                    shape = RoundedCornerShape(12.dp)
                 ) {
-                    Text(
-                        text = uiState.errorMessage!!,
-                        modifier = Modifier.weight(1f),
-                        color = MaterialTheme.colorScheme.onErrorContainer
-                    )
-                    TextButton(
-                        onClick = { viewModel.clearErrorMessage() }
+                    Row(
+                        modifier = Modifier.padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text("关闭")
+                        Text(
+                            text = uiState.errorMessage!!,
+                            modifier = Modifier.weight(1f),
+                            color = MaterialTheme.colorScheme.onErrorContainer
+                        )
+                        TextButton(
+                            onClick = { viewModel.clearErrorMessage() }
+                        ) {
+                            Text("关闭")
+                        }
                     }
                 }
             }
+        }
+
+        // 底部间距，确保内容不会被遮挡
+        item {
+            Spacer(modifier = Modifier.height(32.dp))
         }
     }
 }
