@@ -20,7 +20,11 @@ class HistoryViewModel(private val repository: SensorRepository) : ViewModel() {
         val isLoading: Boolean = false,
         val errorMessage: String? = null,
         val selectedDateRange: DateRange = DateRange.TODAY,
-        val recordCount: Int = 0
+        val recordCount: Int = 0,
+        // 新增各时间范围的记录数
+        val todayCount: Int = 0,
+        val recent24hCount: Int = 0,
+        val recent7dCount: Int = 0
     )
 
     enum class DateRange(val displayName: String) {
@@ -96,5 +100,15 @@ class HistoryViewModel(private val repository: SensorRepository) : ViewModel() {
 
     fun clearErrorMessage() {
         _uiState.value = _uiState.value.copy(errorMessage = null)
+    }
+
+    fun navigateToDetailView(range: DateRange) {
+        _uiState.value = _uiState.value.copy(selectedDateRange = range)
+        // 触发导航逻辑
+    }
+
+    fun loadDataForRange(range: DateRange) {
+        // 根据选择的范围加载对应数据
+        selectDateRange(range)
     }
 }

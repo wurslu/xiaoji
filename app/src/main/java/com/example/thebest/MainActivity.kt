@@ -22,6 +22,7 @@ import androidx.navigation.compose.rememberNavController
 import com.example.thebest.data.local.SensorDatabase
 import com.example.thebest.data.network.NetworkModule
 import com.example.thebest.data.repository.SensorRepository
+import com.example.thebest.ui.compose.HistoryDetailScreen
 import com.example.thebest.ui.compose.HistoryScreen
 import com.example.thebest.ui.compose.SensorScreen
 import com.example.thebest.ui.compose.SettingsScreen
@@ -38,11 +39,9 @@ class MainActivity : ComponentActivity() {
         val httpClient = NetworkModule.provideHttpClient()
         val apiService = NetworkModule.provideApiService(httpClient)
 
-        // 数据库模块
         val database = SensorDatabase.getDatabase(this)
         val sensorDao = database.sensorDao()
 
-        // Repository - 现在包含网络和本地存储
         val repository = SensorRepository(apiService, sensorDao)
 
         setContent {
@@ -115,7 +114,6 @@ fun MainApp(
             startDestination = "sensor",
             modifier = Modifier.padding(innerPadding)
         ) {
-            // 传感器监控页面
             composable("sensor") {
                 val viewModel = viewModel<MainViewModel> {
                     MainViewModel(repository)
@@ -123,15 +121,27 @@ fun MainApp(
                 SensorScreen(viewModel = viewModel)
             }
 
-            // 历史数据页面 - 新增
             composable("history") {
-                val viewModel = viewModel<HistoryViewModel> {
-                    HistoryViewModel(repository)
-                }
-                HistoryScreen(viewModel = viewModel)
+                val viewModel = viewModel<HistoryViewModel> { HistoryViewModel(repository) }
+                HistoryScreen(
+                    viewModel = viewModel,
+                    onNavigateToDetail = { range ->
+                        navController.navigate("history_detail/${range.name}")
+                    }
+                )
             }
 
-            // 设置页面
+            composable("history_detail/{rangeType}") { backStackEntry ->
+                val rangeType = backStackEntry.arguments?.getString("rangeType")
+                val range = HistoryViewModel.DateRange.valueOf(rangeType ?: "TODAY")
+                val viewModel = viewModel<HistoryViewModel> { HistoryViewModel(repository) }
+                HistoryDetailScreen(
+                    viewModel = viewModel,
+                    selectedRange = range,
+                    onBack = { navController.popBackStack() }
+                )
+            }
+
             composable("settings") {
                 val viewModel = viewModel<SettingsViewModel> {
                     SettingsViewModel(apiService)

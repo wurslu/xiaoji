@@ -49,18 +49,21 @@ fun SensorScreen(viewModel: MainViewModel) {
         // 首次获取数据（带保存）
         viewModel.fetchSensorData()
 
-        // 协程1：每秒刷新数据显示
         launch {
+            delay(2_000)
             while (true) {
-                delay(1_000)
-                viewModel.refreshDataOnly()
+                if (!viewModel.isCurrentlyLoading()) {
+                    viewModel.refreshDataOnly()
+                }
+                delay(2_000)
             }
         }
 
         // 协程2：每分钟保存数据
         launch {
+            delay(60_000) // 首次等待1分钟
             while (true) {
-                delay(60_000)
+                delay(60_000) // 60秒 = 1分钟
                 viewModel.saveCurrentData()
             }
         }
@@ -124,8 +127,9 @@ fun SensorScreen(viewModel: MainViewModel) {
 
                     Spacer(modifier = Modifier.height(24.dp))
 
-                    // 简化的状态指示器
-                    SimplifiedStatusIndicator(
+                    // 优化的状态指示器，显示请求间隔
+                    OptimizedStatusIndicator(
+                        isLoading = uiState.isLoading,
                         lastUpdateTime = uiState.lastUpdateTime,
                         lastSaveTime = uiState.lastSaveTime,
                         saveCount = uiState.saveCount
@@ -162,7 +166,8 @@ fun PageHeader(title: String) {
 }
 
 @Composable
-fun SimplifiedStatusIndicator(
+fun OptimizedStatusIndicator(
+    isLoading: Boolean = false,
     lastUpdateTime: Long = 0L,
     lastSaveTime: Long = 0L,
     saveCount: Int = 0
@@ -175,9 +180,33 @@ fun SimplifiedStatusIndicator(
         shape = RoundedCornerShape(12.dp)
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+            modifier = Modifier.padding(16.dp)
         ) {
+            // 如果正在加载，显示加载指示
+            if (isLoading) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(12.dp),
+                        strokeWidth = 1.5.dp,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "正在更新数据...",
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                if (lastUpdateTime > 0L || lastSaveTime > 0L) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
+            }
+
             // 数据更新时间
             if (lastUpdateTime > 0L) {
                 val updateTime = remember(lastUpdateTime) {
@@ -191,13 +220,13 @@ fun SimplifiedStatusIndicator(
                     Icon(
                         imageVector = Icons.Default.Refresh,
                         contentDescription = null,
-                        modifier = Modifier.size(16.dp),
+                        modifier = Modifier.size(14.dp),
                         tint = MaterialTheme.colorScheme.primary
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
                         text = "数据更新: $updateTime",
-                        fontSize = 12.sp,
+                        fontSize = 11.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
@@ -205,7 +234,9 @@ fun SimplifiedStatusIndicator(
 
             // 数据保存时间
             if (lastSaveTime > 0L) {
-                Spacer(modifier = Modifier.height(6.dp))
+                if (lastUpdateTime > 0L) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                }
 
                 val saveTime = remember(lastSaveTime) {
                     java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault())
@@ -218,13 +249,13 @@ fun SimplifiedStatusIndicator(
                     Icon(
                         imageVector = Icons.Default.Save,
                         contentDescription = null,
-                        modifier = Modifier.size(16.dp),
+                        modifier = Modifier.size(14.dp),
                         tint = MaterialTheme.colorScheme.secondary
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
                         text = "数据保存: $saveTime (${saveCount}次)",
-                        fontSize = 12.sp,
+                        fontSize = 11.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
