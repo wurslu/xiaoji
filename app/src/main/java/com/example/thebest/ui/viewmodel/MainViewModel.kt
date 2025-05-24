@@ -1,9 +1,11 @@
 package com.example.thebest.ui.viewmodel
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.thebest.data.model.SensorData
 import com.example.thebest.data.repository.SensorRepository
+import com.example.thebest.widget.SensorWidgetProvider
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -11,7 +13,10 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
-class MainViewModel(private val repository: SensorRepository) : ViewModel() {
+class MainViewModel(
+    private val repository: SensorRepository,
+    private val context: Context? = null
+) : ViewModel() {
 
     private val _uiState = MutableStateFlow(UiState())
     val uiState: StateFlow<UiState> = _uiState.asStateFlow()
@@ -27,7 +32,7 @@ class MainViewModel(private val repository: SensorRepository) : ViewModel() {
         val lastUpdateTime: Long = 0L,
         val lastSaveTime: Long = 0L,
         val saveCount: Int = 0,
-        val requestInterval: String = "10秒" // 新增：显示请求间隔
+        val requestInterval: String = "2秒"
     )
 
     // 检查是否正在加载中（供外部调用）
@@ -63,6 +68,17 @@ class MainViewModel(private val repository: SensorRepository) : ViewModel() {
                                     lastSaveTime = currentTime,
                                     saveCount = _uiState.value.saveCount + 1
                                 )
+
+                                // 更新Widget数据
+                                context?.let {
+                                    SensorWidgetProvider.updateWidgetData(
+                                        it,
+                                        data.temperature,
+                                        data.humidity,
+                                        data.light,
+                                        data.soil
+                                    )
+                                }
                             },
                             onFailure = { error ->
                                 _uiState.value = _uiState.value.copy(
@@ -84,7 +100,6 @@ class MainViewModel(private val repository: SensorRepository) : ViewModel() {
         viewModelScope.launch {
             // 快速检查：如果正在请求中，直接跳过
             if (isRequestInProgress) {
-                println("跳过请求：上一个请求仍在进行中") // 调试用
                 return@launch
             }
 
@@ -112,7 +127,17 @@ class MainViewModel(private val repository: SensorRepository) : ViewModel() {
                                     errorMessage = null,
                                     lastUpdateTime = System.currentTimeMillis()
                                 )
-                                println("数据更新成功：${System.currentTimeMillis()}") // 调试用
+
+                                // 更新Widget数据
+                                context?.let {
+                                    SensorWidgetProvider.updateWidgetData(
+                                        it,
+                                        data.temperature,
+                                        data.humidity,
+                                        data.light,
+                                        data.soil
+                                    )
+                                }
                             },
                             onFailure = { error ->
                                 _uiState.value = _uiState.value.copy(
@@ -121,7 +146,6 @@ class MainViewModel(private val repository: SensorRepository) : ViewModel() {
                                         error.message ?: "未知错误"
                                     } else null // 如果已有数据，不显示错误（静默失败）
                                 )
-                                println("数据更新失败：${error.message}") // 调试用
                             }
                         )
                     }
@@ -142,9 +166,8 @@ class MainViewModel(private val repository: SensorRepository) : ViewModel() {
                         lastSaveTime = System.currentTimeMillis(),
                         saveCount = _uiState.value.saveCount + 1
                     )
-                    println("数据保存成功：第${_uiState.value.saveCount}次") // 调试用
                 } catch (e: Exception) {
-                    println("数据保存失败：${e.message}") // 调试用，不影响用户界面
+                    // 忽略保存错误，不影响实时显示
                 }
             }
         }

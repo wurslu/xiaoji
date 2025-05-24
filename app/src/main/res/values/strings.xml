@@ -1,3 +1,7 @@
 <resources>
     <string name="app_name">the best</string>
+    <string name="widget_description">环境传感器数据监测小组件</string>
+    <string name="widget_loading">加载中…</string>
+    <string name="widget_error">数据获取失败</string>
+    <string name="widget_no_data">暂无数据</string>
 </resources>

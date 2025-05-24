@@ -46,7 +46,7 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             TheBestTheme {
-                MainApp(repository, apiService)
+                MainApp(repository, apiService, this@MainActivity)
             }
         }
     }
@@ -56,7 +56,8 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun MainApp(
     repository: SensorRepository,
-    apiService: com.example.thebest.data.network.ApiService
+    apiService: com.example.thebest.data.network.ApiService,
+    context: MainActivity
 ) {
     val navController = rememberNavController()
 
@@ -116,7 +117,7 @@ fun MainApp(
         ) {
             composable("sensor") {
                 val viewModel = viewModel<MainViewModel> {
-                    MainViewModel(repository)
+                    MainViewModel(repository, context) // 传递Context
                 }
                 SensorScreen(viewModel = viewModel)
             }
