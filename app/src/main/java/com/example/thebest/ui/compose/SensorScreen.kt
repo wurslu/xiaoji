@@ -127,12 +127,10 @@ fun SensorScreen(viewModel: MainViewModel) {
 
                     Spacer(modifier = Modifier.height(24.dp))
 
-                    // 优化的状态指示器，显示请求间隔
-                    OptimizedStatusIndicator(
+                    StatusIndicator(
                         isLoading = uiState.isLoading,
                         lastUpdateTime = uiState.lastUpdateTime,
                         lastSaveTime = uiState.lastSaveTime,
-                        saveCount = uiState.saveCount
                     )
 
                     Spacer(modifier = Modifier.height(100.dp))
@@ -166,11 +164,10 @@ fun PageHeader(title: String) {
 }
 
 @Composable
-fun OptimizedStatusIndicator(
+fun StatusIndicator(
     isLoading: Boolean = false,
     lastUpdateTime: Long = 0L,
     lastSaveTime: Long = 0L,
-    saveCount: Int = 0
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
