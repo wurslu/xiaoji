@@ -8,8 +8,8 @@ import io.ktor.http.HttpStatusCode
 
 class ApiService(private val client: HttpClient) {
 
-    //    private val baseUrl = "http://192.168.56.17:80"
-    private val baseUrl = "http://10.0.2.2:3000"
+    private val baseUrl = "http://192.168.56.17:80"
+//    private val baseUrl = "http://10.0.2.2:3000"
 
     suspend fun getSensorData(): SensorData {
         val url = "$baseUrl/data"
