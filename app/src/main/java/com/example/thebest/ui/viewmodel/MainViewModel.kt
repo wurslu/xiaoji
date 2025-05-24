@@ -1,10 +1,12 @@
 package com.example.thebest.ui.viewmodel
 
 import android.content.Context
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.thebest.data.model.SensorData
 import com.example.thebest.data.repository.SensorRepository
+import com.example.thebest.service.SensorMonitorService
 import com.example.thebest.widget.SensorWidgetProvider
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -14,12 +16,19 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
 class MainViewModel(
-    private val repository: SensorRepository,
-    private val context: Context? = null
+    private val repository: SensorRepository, private val context: Context? = null
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(UiState())
     val uiState: StateFlow<UiState> = _uiState.asStateFlow()
+
+    // 传感器监控服务
+    private val monitorService = context?.let {
+        Log.d("MainViewModel", "创建监控服务，Context: $it")
+        SensorMonitorService(it)
+    }.also {
+        Log.d("MainViewModel", "监控服务创建结果: $it")
+    }
 
     // 添加互斥锁防止并发请求
     private val requestMutex = Mutex()
@@ -32,61 +41,87 @@ class MainViewModel(
         val lastUpdateTime: Long = 0L,
         val lastSaveTime: Long = 0L,
         val saveCount: Int = 0,
-        val requestInterval: String = "2秒"
+        val requestInterval: String = "2秒",
+        val hasActiveAlerts: Boolean = false, // 新增：是否有活跃警报
+        val alertCount: Int = 0 // 新增：警报数量
     )
+
+    // 暴露监控状态
+    val monitoringState = monitorService?.monitoringState
 
     // 检查是否正在加载中（供外部调用）
     fun isCurrentlyLoading(): Boolean {
         return isRequestInProgress || _uiState.value.isLoading
     }
 
-    // 首次获取数据（带保存）- 添加并发控制
+    // 首次获取数据（带保存）- 添加监控检查
     fun fetchSensorData() {
         viewModelScope.launch {
-            // 使用互斥锁防止并发请求
             requestMutex.withLock {
                 if (isRequestInProgress) {
-                    return@withLock // 如果已有请求在进行，直接返回
+                    return@withLock
                 }
 
                 isRequestInProgress = true
                 _uiState.value = _uiState.value.copy(
-                    isLoading = true,
-                    errorMessage = null
+                    isLoading = true, errorMessage = null
                 )
 
                 try {
                     repository.getSensorData().collect { result ->
-                        result.fold(
-                            onSuccess = { data ->
-                                val currentTime = System.currentTimeMillis()
-                                _uiState.value = _uiState.value.copy(
-                                    sensorData = data,
-                                    isLoading = false,
-                                    errorMessage = null,
-                                    lastUpdateTime = currentTime,
-                                    lastSaveTime = currentTime,
-                                    saveCount = _uiState.value.saveCount + 1
-                                )
+                        result.fold(onSuccess = { data ->
+                            val currentTime = System.currentTimeMillis()
 
-                                // 更新Widget数据
-                                context?.let {
-                                    SensorWidgetProvider.updateWidgetData(
-                                        it,
-                                        data.temperature,
-                                        data.humidity,
-                                        data.light,
-                                        data.soil
-                                    )
-                                }
-                            },
-                            onFailure = { error ->
-                                _uiState.value = _uiState.value.copy(
-                                    isLoading = false,
-                                    errorMessage = error.message ?: "未知错误"
+                            Log.d(
+                                "MainViewModel",
+                                "收到传感器数据: 温度=${data.temperature}, 光照=${data.light}"
+                            )
+
+                            // 检查数据异常并发送通知
+                            monitorService?.let {
+                                Log.d("MainViewModel", "调用监控服务检查数据")
+                                it.checkSensorData(data)
+                            } ?: Log.w("MainViewModel", "监控服务为null，无法检查数据")
+
+                            // 更新警报状态
+                            val alertHistory = monitorService?.monitoringState?.value?.alertHistory
+                                ?: emptyList()
+                            val recentAlertsCount = alertHistory.count {
+                                currentTime - it.timestamp < 60 * 60 * 1000L // 最近1小时的警报
+                            }
+
+                            _uiState.value = _uiState.value.copy(
+                                sensorData = data,
+                                isLoading = false,
+                                errorMessage = null,
+                                lastUpdateTime = currentTime,
+                                lastSaveTime = currentTime,
+                                saveCount = _uiState.value.saveCount + 1,
+                                hasActiveAlerts = recentAlertsCount > 0,
+                                alertCount = recentAlertsCount
+                            )
+
+                            // 更新Widget数据
+                            context?.let {
+                                SensorWidgetProvider.updateWidgetData(
+                                    it, data.temperature, data.humidity, data.light, data.soil
                                 )
                             }
-                        )
+                        }, onFailure = { error ->
+                            val detailedError = when {
+                                error.message?.contains("Connection refused") == true -> "服务器连接被拒绝 - 请检查服务器是否启动"
+
+                                error.message?.contains("timeout") == true -> "连接超时 - 请检查网络连接"
+
+                                error.message?.contains("UnknownHostException") == true -> "无法解析主机 - 请检查IP地址"
+
+                                else -> "网络错误: ${error.message}"
+                            }
+
+                            _uiState.value = _uiState.value.copy(
+                                isLoading = false, errorMessage = detailedError
+                            )
+                        })
                     }
                 } finally {
                     isRequestInProgress = false
@@ -95,23 +130,19 @@ class MainViewModel(
         }
     }
 
-    // 仅刷新数据显示（不保存）- 添加并发控制和跳过机制
+    // 仅刷新数据显示（不保存）- 添加监控检查
     fun refreshDataOnly() {
         viewModelScope.launch {
-            // 快速检查：如果正在请求中，直接跳过
             if (isRequestInProgress) {
                 return@launch
             }
 
             requestMutex.withLock {
-                // 双重检查：锁内再次确认没有请求在进行
                 if (isRequestInProgress) {
                     return@withLock
                 }
 
                 isRequestInProgress = true
-
-                // 只有在没有任何数据时才显示加载状态
                 val shouldShowLoading = _uiState.value.sensorData == null
                 if (shouldShowLoading) {
                     _uiState.value = _uiState.value.copy(isLoading = true)
@@ -119,35 +150,42 @@ class MainViewModel(
 
                 try {
                     repository.getSensorDataOnly().collect { result ->
-                        result.fold(
-                            onSuccess = { data ->
-                                _uiState.value = _uiState.value.copy(
-                                    sensorData = data,
-                                    isLoading = false,
-                                    errorMessage = null,
-                                    lastUpdateTime = System.currentTimeMillis()
-                                )
+                        result.fold(onSuccess = { data ->
+                            val currentTime = System.currentTimeMillis()
 
-                                // 更新Widget数据
-                                context?.let {
-                                    SensorWidgetProvider.updateWidgetData(
-                                        it,
-                                        data.temperature,
-                                        data.humidity,
-                                        data.light,
-                                        data.soil
-                                    )
-                                }
-                            },
-                            onFailure = { error ->
-                                _uiState.value = _uiState.value.copy(
-                                    isLoading = false,
-                                    errorMessage = if (_uiState.value.sensorData == null) {
-                                        error.message ?: "未知错误"
-                                    } else null // 如果已有数据，不显示错误（静默失败）
+                            // 检查数据异常
+                            monitorService?.checkSensorData(data)
+
+                            // 更新警报状态
+                            val alertHistory = monitorService?.monitoringState?.value?.alertHistory
+                                ?: emptyList()
+                            val recentAlertsCount = alertHistory.count {
+                                currentTime - it.timestamp < 60 * 60 * 1000L
+                            }
+
+                            _uiState.value = _uiState.value.copy(
+                                sensorData = data,
+                                isLoading = false,
+                                errorMessage = null,
+                                lastUpdateTime = currentTime,
+                                hasActiveAlerts = recentAlertsCount > 0,
+                                alertCount = recentAlertsCount
+                            )
+
+                            // 更新Widget数据
+                            context?.let {
+                                SensorWidgetProvider.updateWidgetData(
+                                    it, data.temperature, data.humidity, data.light, data.soil
                                 )
                             }
-                        )
+                        }, onFailure = { error ->
+                            _uiState.value = _uiState.value.copy(
+                                isLoading = false,
+                                errorMessage = if (_uiState.value.sensorData == null) {
+                                    error.message ?: "未知错误"
+                                } else null
+                            )
+                        })
                     }
                 } finally {
                     isRequestInProgress = false
@@ -175,7 +213,6 @@ class MainViewModel(
 
     // 手动重试
     fun manualRetry() {
-        // 重置状态后重新获取数据
         isRequestInProgress = false
         fetchSensorData()
     }
@@ -185,9 +222,21 @@ class MainViewModel(
         refreshDataOnly()
     }
 
-    // 获取当前请求状态信息（用于调试）
-    fun getRequestStatus(): String {
-        return "请求状态: ${if (isRequestInProgress) "进行中" else "空闲"}, " +
-                "UI加载: ${_uiState.value.isLoading}"
+    // 获取警报历史
+    fun getAlertHistory(): List<String> {
+        return monitorService?.getFormattedAlertHistory() ?: emptyList()
+    }
+
+    // 清除警报历史
+    fun clearAlertHistory() {
+        monitorService?.clearAlertHistory()
+        _uiState.value = _uiState.value.copy(
+            hasActiveAlerts = false, alertCount = 0
+        )
+    }
+
+    // 更新监控设置
+    fun updateMonitoringSettings(tempThreshold: Int, lightThreshold: Int) {
+        monitorService?.updateThresholds(tempThreshold, lightThreshold)
     }
 }

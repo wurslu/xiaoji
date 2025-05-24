@@ -24,7 +24,9 @@ import com.example.thebest.data.network.NetworkModule
 import com.example.thebest.data.repository.SensorRepository
 import com.example.thebest.ui.compose.HistoryDetailScreen
 import com.example.thebest.ui.compose.HistoryScreen
+import com.example.thebest.ui.compose.NotificationSettingsScreen
 import com.example.thebest.ui.compose.SensorScreen
+import com.example.thebest.ui.compose.SettingsMainScreen
 import com.example.thebest.ui.compose.SettingsScreen
 import com.example.thebest.ui.theme.TheBestTheme
 import com.example.thebest.ui.viewmodel.HistoryViewModel
@@ -145,9 +147,43 @@ fun MainApp(
 
             composable("settings") {
                 val viewModel = viewModel<SettingsViewModel> {
-                    SettingsViewModel(apiService)
+                    SettingsViewModel(apiService, context)
                 }
-                SettingsScreen(viewModel = viewModel)
+                SettingsMainScreen(
+                    viewModel = viewModel,
+                    onNavigateToThresholds = {
+                        navController.navigate("settings_thresholds")
+                    },
+                    onNavigateToNotifications = {
+                        navController.navigate("settings_notifications")
+                    },
+                    onNavigateToGeneral = {
+                        // 暂时不实现
+                    },
+                    onNavigateToAbout = {
+                        // 暂时不实现
+                    }
+                )
+            }
+
+            composable("settings_thresholds") {
+                val viewModel = viewModel<SettingsViewModel> {
+                    SettingsViewModel(apiService, context)
+                }
+                SettingsScreen(
+                    viewModel = viewModel,
+                    onBack = { navController.popBackStack() }
+                )
+            }
+
+            composable("settings_notifications") {
+                val viewModel = viewModel<SettingsViewModel> {
+                    SettingsViewModel(apiService, context)
+                }
+                NotificationSettingsScreen(
+                    viewModel = viewModel,
+                    onBack = { navController.popBackStack() }
+                )
             }
         }
     }

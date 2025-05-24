@@ -8,16 +8,29 @@ import io.ktor.http.HttpStatusCode
 
 class ApiService(private val client: HttpClient) {
 
-    private val port = "80"
-    private val baseUrl = "http://192.168.78.156:$port"
+    //    private val baseUrl = "http://192.168.56.17:80"
+    private val baseUrl = "http://10.0.2.2:3000"
 
     suspend fun getSensorData(): SensorData {
-        return client.get("$baseUrl/data").body()
+        val url = "$baseUrl/data"
+
+        return try {
+            val response = client.get(url)
+
+            val data = response.body<SensorData>()
+            data
+        } catch (e: Exception) {
+            e.printStackTrace()
+            throw e
+        }
     }
 
     suspend fun setThreshold(tempThreshold: Int, lightThreshold: Int): String {
+        val url =
+            "$baseUrl/setThreshold?tempThreshold=$tempThreshold&lightThreshold=$lightThreshold"
+
         return try {
-            val response = client.get("$baseUrl/setThreshold?tempThreshold=$tempThreshold&lightThreshold=$lightThreshold")
+            val response = client.get(url)
 
             if (response.status == HttpStatusCode.OK) {
                 "设置成功"

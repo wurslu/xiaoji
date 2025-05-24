@@ -6,6 +6,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBackIosNew
 import androidx.compose.material.icons.filled.DeviceThermostat
 import androidx.compose.material.icons.filled.WbSunny
 import androidx.compose.material3.*
@@ -17,82 +18,128 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.thebest.ui.viewmodel.SettingsViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen(viewModel: SettingsViewModel) {
+fun SettingsScreen(
+    viewModel: SettingsViewModel,
+    onBack: (() -> Unit)? = null
+) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
-    Box(modifier = Modifier.fillMaxSize()) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(20.dp)
-        ) {
-            // 简化的标题区域
-            PageHeader(title = "阈值设置")
-
-            Spacer(modifier = Modifier.height(32.dp))
-
-            // 设置卡片
-            Column(
-                verticalArrangement = Arrangement.spacedBy(20.dp)
+    Column(
+        modifier = Modifier.fillMaxSize()
+    ) {
+        // 顶部导航栏（仅在有返回回调时显示）
+        if (onBack != null) {
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                color = MaterialTheme.colorScheme.surface,
             ) {
-                // 温度阈值设置
-                TemperatureSettingCard(
-                    tempThreshold = uiState.temperatureThreshold,
-                    onTempThresholdChange = viewModel::updateTemperatureThreshold
-                )
-
-                // 光强阈值设置
-                LightSettingCard(
-                    lightThreshold = uiState.lightThreshold,
-                    onLightThresholdChange = viewModel::updateLightThreshold
-                )
-
-                Spacer(modifier = Modifier.height(20.dp))
-
-                // 更新按钮
-                Button(
-                    onClick = viewModel::saveSettings,
+                Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(56.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.primary,
-                        contentColor = MaterialTheme.colorScheme.onPrimary
-                    ),
-                    shape = RoundedCornerShape(16.dp),
-                    elevation = ButtonDefaults.buttonElevation(defaultElevation = 8.dp),
-                    enabled = !uiState.isSaving
+                        .statusBarsPadding()
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
+                    IconButton(
+                        onClick = onBack,
+                        modifier = Modifier.size(40.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.ArrowBackIosNew,
+                            contentDescription = "返回",
+                            tint = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.width(12.dp))
+
                     Text(
-                        text = "更新阈值",
-                        fontSize = 18.sp,
+                        text = "阈值设置",
+                        style = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.Bold,
-                        maxLines = 1
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                 }
-
-                // 添加底部间距，确保按钮不被导航栏遮挡
-                Spacer(modifier = Modifier.height(100.dp))
             }
         }
 
-        if (uiState.isSaving) {
-            LoadingOverlay()
-        }
+        // 主要内容
+        Box(modifier = Modifier.fillMaxSize()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(20.dp)
+            ) {
+                // 如果没有顶部导航栏，显示简化标题
+                if (onBack == null) {
+                    PageHeader(title = "阈值设置")
+                    Spacer(modifier = Modifier.height(32.dp))
+                } else {
+                    Spacer(modifier = Modifier.height(16.dp))
+                }
 
-        if (uiState.saveMessage.isNotEmpty() && !uiState.isSaving) {
-            ResultOverlay(
-                message = uiState.saveMessage,
-                isSuccess = uiState.saveSuccess,
-                onDismiss = viewModel::clearSaveMessage
-            )
+                // 设置卡片
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(20.dp)
+                ) {
+                    // 温度阈值设置
+                    TemperatureSettingCard(
+                        tempThreshold = uiState.temperatureThreshold,
+                        onTempThresholdChange = viewModel::updateTemperatureThreshold
+                    )
+
+                    // 光强阈值设置
+                    LightSettingCard(
+                        lightThreshold = uiState.lightThreshold,
+                        onLightThresholdChange = viewModel::updateLightThreshold
+                    )
+
+                    Spacer(modifier = Modifier.height(20.dp))
+
+                    // 更新按钮
+                    Button(
+                        onClick = viewModel::saveSettings,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(56.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primary,
+                            contentColor = MaterialTheme.colorScheme.onPrimary
+                        ),
+                        shape = RoundedCornerShape(16.dp),
+                        elevation = ButtonDefaults.buttonElevation(defaultElevation = 8.dp),
+                        enabled = !uiState.isSaving
+                    ) {
+                        Text(
+                            text = "更新阈值",
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1
+                        )
+                    }
+
+                    // 添加底部间距，确保按钮不被导航栏遮挡
+                    Spacer(modifier = Modifier.height(100.dp))
+                }
+            }
+
+            if (uiState.isSaving) {
+                LoadingOverlay()
+            }
+
+            if (uiState.saveMessage.isNotEmpty() && !uiState.isSaving) {
+                ResultOverlay(
+                    message = uiState.saveMessage,
+                    isSuccess = uiState.saveSuccess,
+                    onDismiss = viewModel::clearSaveMessage
+                )
+            }
         }
     }
 }
@@ -127,7 +174,7 @@ fun LoadingOverlay() {
 
                 Text(
                     text = "更新中...",
-                    fontSize = 14.sp,
+                    style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurface,
                     fontWeight = FontWeight.Medium
                 )
@@ -173,16 +220,14 @@ fun ResultOverlay(
                 // 强制显示图标和状态信息
                 Text(
                     text = if (isSuccess) "✅" else "❌",
-                    fontSize = 48.sp
+                    style = MaterialTheme.typography.displaySmall
                 )
-
-                Spacer(modifier = Modifier.height(8.dp))
 
                 Spacer(modifier = Modifier.height(16.dp))
 
                 Text(
                     text = message,
-                    fontSize = 18.sp,
+                    style = MaterialTheme.typography.bodyLarge,
                     fontWeight = FontWeight.Bold,
                     color = if (isSuccess)
                         MaterialTheme.colorScheme.onSurface
@@ -194,7 +239,6 @@ fun ResultOverlay(
         }
     }
 }
-
 
 @Composable
 fun TemperatureSettingCard(
@@ -278,7 +322,7 @@ fun SettingCard(
 
                 Text(
                     text = title,
-                    fontSize = 20.sp,
+                    style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
                 )
