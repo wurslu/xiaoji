@@ -254,7 +254,7 @@ fun OptimizedStatusIndicator(
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        text = "数据保存: $saveTime (${saveCount}次)",
+                        text = "数据保存: $saveTime",
                         fontSize = 11.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
