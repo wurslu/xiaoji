@@ -30,21 +30,21 @@ fun HistoryScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
-    // 使用LazyColumn替代Column + verticalScroll
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(20.dp),
         verticalArrangement = Arrangement.spacedBy(0.dp)
     ) {
-        // 页面标题
         item {
             PageHeader(title = "历史数据")
             Spacer(modifier = Modifier.height(32.dp))
         }
 
-        // 数据统计卡片
         item {
             Card(
+                onClick = {
+                    onNavigateToDetail(HistoryViewModel.DateRange.ALL)
+                },
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(
@@ -70,28 +70,46 @@ fun HistoryScreen(
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onPrimaryContainer
                         )
+                        if (uiState.recordCount > 0) {
+                            Text(
+                                text = "点击查看全部数据",
+                                fontSize = 12.sp,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f),
+                                modifier = Modifier.padding(top = 2.dp)
+                            )
+                        }
                     }
 
-                    if (uiState.isLoading) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(20.dp),
-                            strokeWidth = 2.dp,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer
-                        )
-                    } else {
-                        Icon(
-                            Icons.Default.Assessment,
-                            contentDescription = null,
-                            modifier = Modifier.size(32.dp),
-                            tint = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
-                        )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        if (uiState.isLoading) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(20.dp),
+                                strokeWidth = 2.dp,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                        } else if (uiState.recordCount > 0) {
+                            Icon(
+                                imageVector = Icons.Default.ChevronRight,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        } else {
+                            Icon(
+                                Icons.Default.Assessment,
+                                contentDescription = null,
+                                modifier = Modifier.size(32.dp),
+                                tint = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
+                            )
+                        }
                     }
                 }
             }
             Spacer(modifier = Modifier.height(24.dp))
         }
 
-        // 时间范围选择说明
         item {
             Text(
                 text = "选择时间范围查看数据",
@@ -102,8 +120,7 @@ fun HistoryScreen(
             )
         }
 
-        // 时间范围选择卡片 - 使用items而不是嵌套滚动
-        items(HistoryViewModel.DateRange.entries) { range ->
+        items(HistoryViewModel.DateRange.entries.filter { it != HistoryViewModel.DateRange.ALL }) { range ->
             HistoryRangeCard(
                 range = range,
                 recordCount = getRecordCountForRange(range, uiState),
@@ -114,7 +131,6 @@ fun HistoryScreen(
             Spacer(modifier = Modifier.height(12.dp))
         }
 
-        // 清除数据按钮
         item {
             Spacer(modifier = Modifier.height(20.dp))
             Button(
@@ -142,7 +158,6 @@ fun HistoryScreen(
             }
         }
 
-        // 错误信息显示
         if (uiState.errorMessage != null) {
             item {
                 Spacer(modifier = Modifier.height(16.dp))
@@ -172,7 +187,6 @@ fun HistoryScreen(
             }
         }
 
-        // 底部间距，确保内容不会被遮挡
         item {
             Spacer(modifier = Modifier.height(32.dp))
         }
@@ -510,14 +524,12 @@ fun SensorValueItem(
     }
 }
 
-// 辅助函数：根据时间范围获取记录数（临时实现）
 private fun getRecordCountForRange(
     range: HistoryViewModel.DateRange,
     uiState: HistoryViewModel.UiState
 ): Int {
-    // 这里暂时返回总数，你需要在 ViewModel 中实现具体的统计逻辑
     return when (range) {
         HistoryViewModel.DateRange.ALL -> uiState.recordCount
-        else -> uiState.recordCount // 临时实现，实际需要按时间范围统计
+        else -> uiState.recordCount
     }
 }
