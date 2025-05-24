@@ -26,37 +26,17 @@ import com.example.thebest.ui.viewmodel.SettingsViewModel
 fun SettingsScreen(viewModel: SettingsViewModel) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-    ) {
+    Box(modifier = Modifier.fillMaxSize()) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .verticalScroll(rememberScrollState()) // 添加垂直滚动
-                .padding(20.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+                .verticalScroll(rememberScrollState())
+                .padding(20.dp)
         ) {
-            // 标题区域
-            Spacer(modifier = Modifier.height(40.dp))
+            // 简化的标题区域
+            PageHeader(title = "阈值设置")
 
-            Text(
-                text = "传感器设置",
-                fontSize = 28.sp,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onBackground,
-                textAlign = TextAlign.Center
-            )
-
-            Text(
-                text = "设置环境监测阈值",
-                fontSize = 16.sp,
-                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
-                textAlign = TextAlign.Center,
-                modifier = Modifier.padding(top = 8.dp)
-            )
-
-            Spacer(modifier = Modifier.height(40.dp))
+            Spacer(modifier = Modifier.height(32.dp))
 
             // 设置卡片
             Column(

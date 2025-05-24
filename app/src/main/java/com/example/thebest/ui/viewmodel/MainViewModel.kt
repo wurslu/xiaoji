@@ -18,33 +18,55 @@ class MainViewModel(private val repository: SensorRepository) : ViewModel() {
         val sensorData: SensorData? = null,
         val isLoading: Boolean = false,
         val errorMessage: String? = null,
-        val lastUpdateTime: Long = 0L
+        val lastUpdateTime: Long = 0L,
+        val lastSaveTime: Long = 0L,
+        val saveCount: Int = 0
     )
 
     fun fetchSensorData() {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(
-                isLoading = true, errorMessage = null
+                isLoading = true,
+                errorMessage = null
             )
 
             repository.getSensorData().collect { result ->
-                result.fold(onSuccess = { data ->
-                    _uiState.value = _uiState.value.copy(
-                        sensorData = data,
-                        isLoading = false,
-                        errorMessage = null,
-                        lastUpdateTime = System.currentTimeMillis()
-                    )
-                }, onFailure = { error ->
-                    _uiState.value = _uiState.value.copy(
-                        isLoading = false, errorMessage = error.message ?: "未知错误"
-                    )
-                })
+                result.fold(
+                    onSuccess = { data ->
+                        val currentTime = System.currentTimeMillis()
+                        _uiState.value = _uiState.value.copy(
+                            sensorData = data,
+                            isLoading = false,
+                            errorMessage = null,
+                            lastUpdateTime = currentTime,
+                            lastSaveTime = currentTime,
+                            saveCount = _uiState.value.saveCount + 1
+                        )
+                    },
+                    onFailure = { error ->
+                        _uiState.value = _uiState.value.copy(
+                            isLoading = false,
+                            errorMessage = error.message ?: "未知错误"
+                        )
+                    }
+                )
             }
         }
     }
 
-    fun refreshDataSilently() {
+    fun saveCurrentData() {
+        viewModelScope.launch {
+            _uiState.value.sensorData?.let { data ->
+                repository.saveSensorData(data)
+                _uiState.value = _uiState.value.copy(
+                    lastSaveTime = System.currentTimeMillis(),
+                    saveCount = _uiState.value.saveCount + 1
+                )
+            }
+        }
+    }
+
+    fun refreshDataOnly() {
         viewModelScope.launch {
             val shouldShowLoading = _uiState.value.sensorData == null
 
@@ -52,22 +74,65 @@ class MainViewModel(private val repository: SensorRepository) : ViewModel() {
                 _uiState.value = _uiState.value.copy(isLoading = true)
             }
 
-            repository.getSensorData().collect { result ->
-                result.fold(onSuccess = { data ->
+            repository.getSensorDataOnly().collect { result ->
+                result.fold(
+                    onSuccess = { data ->
+                        _uiState.value = _uiState.value.copy(
+                            sensorData = data,
+                            isLoading = false,
+                            errorMessage = null,
+                            lastUpdateTime = System.currentTimeMillis()
+                        )
+                    },
+                    onFailure = { error ->
+                        _uiState.value = _uiState.value.copy(
+                            isLoading = false,
+                            errorMessage = if (_uiState.value.sensorData == null) {
+                                error.message ?: "未知错误"
+                            } else null
+                        )
+                    }
+                )
+            }
+        }
+
+        fun saveCurrentData() {
+            viewModelScope.launch {
+                _uiState.value.sensorData?.let { data ->
+                    repository.saveSensorData(data)
                     _uiState.value = _uiState.value.copy(
-                        sensorData = data,
-                        isLoading = false,
-                        errorMessage = null,
-                        lastUpdateTime = System.currentTimeMillis()
+                        lastSaveTime = System.currentTimeMillis(),
+                        saveCount = _uiState.value.saveCount + 1
                     )
-                }, onFailure = { error ->
-                    _uiState.value = _uiState.value.copy(
-                        isLoading = false,
-                        errorMessage = if (_uiState.value.sensorData == null) {
-                            error.message ?: "未知错误"
-                        } else null
-                    )
-                })
+                }
+            }
+        }
+
+        fun refreshDataSilently() {
+            viewModelScope.launch {
+                val shouldShowLoading = _uiState.value.sensorData == null
+
+                if (shouldShowLoading) {
+                    _uiState.value = _uiState.value.copy(isLoading = true)
+                }
+
+                repository.getSensorData().collect { result ->
+                    result.fold(onSuccess = { data ->
+                        _uiState.value = _uiState.value.copy(
+                            sensorData = data,
+                            isLoading = false,
+                            errorMessage = null,
+                            lastUpdateTime = System.currentTimeMillis()
+                        )
+                    }, onFailure = { error ->
+                        _uiState.value = _uiState.value.copy(
+                            isLoading = false,
+                            errorMessage = if (_uiState.value.sensorData == null) {
+                                error.message ?: "未知错误"
+                            } else null
+                        )
+                    })
+                }
             }
         }
     }

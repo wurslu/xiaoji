@@ -5,6 +5,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
@@ -18,20 +19,31 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.example.thebest.data.local.SensorDatabase
 import com.example.thebest.data.network.NetworkModule
 import com.example.thebest.data.repository.SensorRepository
+import com.example.thebest.ui.compose.HistoryScreen
 import com.example.thebest.ui.compose.SensorScreen
 import com.example.thebest.ui.compose.SettingsScreen
 import com.example.thebest.ui.theme.TheBestTheme
+import com.example.thebest.ui.viewmodel.HistoryViewModel
 import com.example.thebest.ui.viewmodel.MainViewModel
 import com.example.thebest.ui.viewmodel.SettingsViewModel
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // 网络模块
         val httpClient = NetworkModule.provideHttpClient()
         val apiService = NetworkModule.provideApiService(httpClient)
-        val repository = SensorRepository(apiService)
+
+        // 数据库模块
+        val database = SensorDatabase.getDatabase(this)
+        val sensorDao = database.sensorDao()
+
+        // Repository - 现在包含网络和本地存储
+        val repository = SensorRepository(apiService, sensorDao)
 
         setContent {
             TheBestTheme {
@@ -49,11 +61,17 @@ fun MainApp(
 ) {
     val navController = rememberNavController()
 
+    // 导航项目 - 新增历史数据页面
     val items = listOf(
         NavigationItem(
             title = "监控",
             icon = Icons.Default.Home,
             route = "sensor"
+        ),
+        NavigationItem(
+            title = "历史",
+            icon = Icons.Default.History,
+            route = "history"
         ),
         NavigationItem(
             title = "设置",
@@ -97,12 +115,23 @@ fun MainApp(
             startDestination = "sensor",
             modifier = Modifier.padding(innerPadding)
         ) {
+            // 传感器监控页面
             composable("sensor") {
                 val viewModel = viewModel<MainViewModel> {
                     MainViewModel(repository)
                 }
                 SensorScreen(viewModel = viewModel)
             }
+
+            // 历史数据页面 - 新增
+            composable("history") {
+                val viewModel = viewModel<HistoryViewModel> {
+                    HistoryViewModel(repository)
+                }
+                HistoryScreen(viewModel = viewModel)
+            }
+
+            // 设置页面
             composable("settings") {
                 val viewModel = viewModel<SettingsViewModel> {
                     SettingsViewModel(apiService)

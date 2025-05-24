@@ -17,9 +17,10 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Agriculture
 import androidx.compose.material.icons.filled.DeviceThermostat
 import androidx.compose.material.icons.filled.Grass
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.WaterDrop
 import androidx.compose.material.icons.filled.WbSunny
 import androidx.compose.material3.*
@@ -37,48 +38,45 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.thebest.ui.viewmodel.MainViewModel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SensorScreen(viewModel: MainViewModel) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+
     LaunchedEffect(Unit) {
+        // 首次获取数据（带保存）
         viewModel.fetchSensorData()
-        while (true) {
-            delay(5000)
-            viewModel.refreshDataSilently()
+
+        // 协程1：每秒刷新数据显示
+        launch {
+            while (true) {
+                delay(1_000)
+                viewModel.refreshDataOnly()
+            }
+        }
+
+        // 协程2：每分钟保存数据
+        launch {
+            while (true) {
+                delay(60_000)
+                viewModel.saveCurrentData()
+            }
         }
     }
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-
-    ) {
+    Box(modifier = Modifier.fillMaxSize()) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .padding(20.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+                .padding(20.dp)
         ) {
-            Spacer(modifier = Modifier.height(40.dp))
+            // 简化的标题区域
+            PageHeader(title = "环境数据监测")
 
-            Text(
-                text = "智能传感器监控",
-                fontSize = 28.sp,
-                fontWeight = FontWeight.Bold,
-                textAlign = TextAlign.Center
-            )
-
-            Text(
-                text = "实时环境数据监测",
-                fontSize = 16.sp,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.padding(top = 8.dp)
-            )
-
-            Spacer(modifier = Modifier.height(40.dp))
+            Spacer(modifier = Modifier.height(32.dp))
 
             when {
                 uiState.isLoading && uiState.sensorData == null -> {
@@ -126,9 +124,11 @@ fun SensorScreen(viewModel: MainViewModel) {
 
                     Spacer(modifier = Modifier.height(24.dp))
 
-                    StatusIndicator(
-                        isUpdating = uiState.isLoading,
-                        lastUpdateTime = uiState.lastUpdateTime
+                    // 简化的状态指示器
+                    SimplifiedStatusIndicator(
+                        lastUpdateTime = uiState.lastUpdateTime,
+                        lastSaveTime = uiState.lastSaveTime,
+                        saveCount = uiState.saveCount
                     )
 
                     Spacer(modifier = Modifier.height(100.dp))
@@ -145,6 +145,95 @@ fun SensorScreen(viewModel: MainViewModel) {
 }
 
 @Composable
+fun PageHeader(title: String) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 20.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = title,
+            fontSize = 24.sp,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onBackground
+        )
+    }
+}
+
+@Composable
+fun SimplifiedStatusIndicator(
+    lastUpdateTime: Long = 0L,
+    lastSaveTime: Long = 0L,
+    saveCount: Int = 0
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+        ),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            // 数据更新时间
+            if (lastUpdateTime > 0L) {
+                val updateTime = remember(lastUpdateTime) {
+                    java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault())
+                        .format(java.util.Date(lastUpdateTime))
+                }
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Refresh,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "数据更新: $updateTime",
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
+            // 数据保存时间
+            if (lastSaveTime > 0L) {
+                Spacer(modifier = Modifier.height(6.dp))
+
+                val saveTime = remember(lastSaveTime) {
+                    java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault())
+                        .format(java.util.Date(lastSaveTime))
+                }
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Save,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                        tint = MaterialTheme.colorScheme.secondary
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "数据保存: $saveTime (${saveCount}次)",
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
 fun SensorCard(
     icon: ImageVector,
     title: String,
@@ -153,8 +242,7 @@ fun SensorCard(
     subtitle: String
 ) {
     Card(
-        modifier = Modifier
-            .fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
@@ -184,9 +272,7 @@ fun SensorCard(
 
             Spacer(modifier = Modifier.width(20.dp))
 
-            Column(
-                modifier = Modifier.weight(1f)
-            ) {
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = title,
                     fontSize = 16.sp,
@@ -263,8 +349,7 @@ fun LoadingCard() {
 @Composable
 fun ErrorCard(errorMessage: String, onRetry: () -> Unit) {
     Card(
-        modifier = Modifier
-            .fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
@@ -305,64 +390,6 @@ fun ErrorCard(errorMessage: String, onRetry: () -> Unit) {
             ) {
                 Text("重新连接", color = MaterialTheme.colorScheme.onPrimary)
             }
-        }
-    }
-}
-
-@Composable
-fun StatusIndicator(
-    isUpdating: Boolean = false,
-    lastUpdateTime: Long = 0L
-) {
-    val infiniteTransition = rememberInfiniteTransition(label = "status")
-    val scale by infiniteTransition.animateFloat(
-        initialValue = 1f,
-        targetValue = if (isUpdating) 1.2f else 1.1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(if (isUpdating) 500 else 1000),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "scale"
-    )
-
-    val statusColor =
-        if (isUpdating) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.primary
-    val statusText = if (isUpdating) "正在更新..." else "实时监控中"
-
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        // 状态行：圆点和状态文字在同一行
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Center
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(12.dp * scale)
-                    .clip(RoundedCornerShape(6.dp))
-                    .background(statusColor)
-            )
-
-            Spacer(modifier = Modifier.width(8.dp))
-
-            Text(
-                text = statusText,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Medium
-            )
-        }
-
-        if (lastUpdateTime > 0L && !isUpdating) {
-            val updateTime = remember(lastUpdateTime) {
-                java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault())
-                    .format(java.util.Date(lastUpdateTime))
-            }
-            Text(
-                text = "更新时间: $updateTime",
-                fontSize = 12.sp,
-                modifier = Modifier.padding(top = 4.dp)
-            )
         }
     }
 }
