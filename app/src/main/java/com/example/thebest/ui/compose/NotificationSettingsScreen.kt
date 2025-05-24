@@ -1,13 +1,7 @@
 package com.example.thebest.ui.compose
 
-// 在相关文件顶部添加
-import android.Manifest
 import android.content.Intent
-import android.os.Build
 import android.provider.Settings
-import android.widget.Toast
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
@@ -17,7 +11,6 @@ import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -43,18 +36,7 @@ fun NotificationSettingsScreen(
         mutableStateOf(NotificationPermissionManager.hasPermission(context))
     }
 
-    val permissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission()
-    ) { isGranted ->
-        hasNotificationPermission = isGranted
-        if (isGranted) {
-            // 权限获得后，可以考虑自动开启监控
-            viewModel.updateMonitoringEnabled(true)
-        }
-    }
-
     LaunchedEffect(Unit) {
-        // 每次进入页面时重新检查权限状态
         hasNotificationPermission = NotificationPermissionManager.hasPermission(context)
     }
 
@@ -101,46 +83,23 @@ fun NotificationSettingsScreen(
             contentPadding = PaddingValues(20.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // 通知权限状态卡片 - 调试版本
+            // 通知权限状态卡片 - 简化版
             item {
-                NotificationPermissionCard(
-                    hasPermission = hasNotificationPermission,
-                    onRequestPermission = {
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                            // 调试：添加日志
-                            println("尝试申请通知权限")
-                            permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                        } else {
-                            // Android 13以下，引导用户到系统设置
-                            try {
-                                val intent = Intent().apply {
-                                    action = Settings.ACTION_APP_NOTIFICATION_SETTINGS
-                                    putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
-                                }
-                                context.startActivity(intent)
-                            } catch (e: Exception) {
-                                // 如果无法打开设置，显示提示
-                                Toast.makeText(
-                                    context,
-                                    "请在系统设置中开启通知权限",
-                                    Toast.LENGTH_LONG
-                                ).show()
-                            }
-                        }
-                    }
+                NotificationPermissionStatusCard(
+                    hasPermission = hasNotificationPermission
                 )
             }
 
-            // 通知总开关 - 根据权限状态动态调整
+            // 通知总开关
             item {
                 NotificationToggleCard(
                     title = "启用通知监控",
                     subtitle = if (hasNotificationPermission)
                         "开启后将在环境异常时发送通知"
                     else
-                        "需要先授权通知权限才能启用监控",
+                        "需要先在系统设置中开启通知权限",
                     isEnabled = hasNotificationPermission && (monitoringState?.isMonitoringEnabled == true),
-                    canToggle = hasNotificationPermission, // 新增参数控制是否可以切换
+                    canToggle = hasNotificationPermission,
                     onToggle = { enabled ->
                         if (hasNotificationPermission) {
                             viewModel.updateMonitoringEnabled(enabled)
@@ -236,11 +195,13 @@ fun NotificationSettingsScreen(
     }
 }
 
+// 简化的权限状态卡片 - 不提供申请按钮，只显示状态和引导
 @Composable
-fun NotificationPermissionCard(
-    hasPermission: Boolean,
-    onRequestPermission: () -> Unit
+fun NotificationPermissionStatusCard(
+    hasPermission: Boolean
 ) {
+    val context = LocalContext.current
+
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
@@ -249,7 +210,8 @@ fun NotificationPermissionCard(
             else
                 MaterialTheme.colorScheme.errorContainer
         ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        shape = RoundedCornerShape(16.dp)
     ) {
         Column(
             modifier = Modifier
@@ -275,7 +237,7 @@ fun NotificationPermissionCard(
                     modifier = Modifier.weight(1f)
                 ) {
                     Text(
-                        text = if (hasPermission) "通知权限已授权" else "需要通知权限",
+                        text = if (hasPermission) "通知权限已开启" else "通知权限未开启",
                         style = MaterialTheme.typography.bodyLarge,
                         fontWeight = FontWeight.Medium,
                         color = if (hasPermission)
@@ -283,11 +245,12 @@ fun NotificationPermissionCard(
                         else
                             MaterialTheme.colorScheme.onErrorContainer
                     )
+
                     Text(
                         text = if (hasPermission)
                             "应用可以发送环境异常通知"
                         else
-                            "点击按钮申请通知权限以接收环境异常提醒",
+                            "请前往系统设置 > 应用 > the best > 通知，开启通知权限",
                         style = MaterialTheme.typography.bodyMedium,
                         color = if (hasPermission)
                             MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
@@ -298,19 +261,41 @@ fun NotificationPermissionCard(
                 }
             }
 
+            // 如果没有权限，提供一个便捷的打开系统设置按钮
             if (!hasPermission) {
                 Spacer(modifier = Modifier.height(16.dp))
 
-                Button(
-                    onClick = onRequestPermission,
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.error
-                    ),
+                OutlinedButton(
+                    onClick = {
+                        try {
+                            val intent = Intent().apply {
+                                action = Settings.ACTION_APP_NOTIFICATION_SETTINGS
+                                putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+                            }
+                            context.startActivity(intent)
+                        } catch (e1: Exception) {
+                            // 如果无法打开应用专用设置，打开通用通知设置
+                            try {
+                                val intent = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                                context.startActivity(intent)
+                            } catch (e2: Exception) {
+                                // 最后尝试打开应用信息页面
+                                try {
+                                    val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                                        data = android.net.Uri.parse("package:${context.packageName}")
+                                    }
+                                    context.startActivity(intent)
+                                } catch (e3: Exception) {
+                                    // 忽略所有异常
+                                }
+                            }
+                        }
+                    },
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Icon(Icons.Default.Notifications, contentDescription = null)
+                    Icon(Icons.Default.Settings, contentDescription = null)
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("申请通知权限")
+                    Text("打开系统设置")
                 }
             }
         }
@@ -322,7 +307,7 @@ fun NotificationToggleCard(
     title: String,
     subtitle: String,
     isEnabled: Boolean,
-    canToggle: Boolean = true, // 新增参数
+    canToggle: Boolean = true,
     onToggle: (Boolean) -> Unit
 ) {
     Card(
@@ -368,7 +353,7 @@ fun NotificationToggleCard(
             Switch(
                 checked = isEnabled,
                 onCheckedChange = onToggle,
-                enabled = canToggle // 根据权限状态控制是否可用
+                enabled = canToggle
             )
         }
     }
@@ -425,7 +410,6 @@ fun QuietHoursCard(
 
             Spacer(modifier = Modifier.height(20.dp))
 
-            // 优化后的时间选择区域 - 更美观的布局
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceEvenly,
@@ -437,7 +421,6 @@ fun QuietHoursCard(
                     onClick = { showStartTimePicker = true }
                 )
 
-                // 更美观的箭头指示
                 Surface(
                     modifier = Modifier.size(40.dp),
                     shape = CircleShape,
@@ -462,7 +445,6 @@ fun QuietHoursCard(
         }
     }
 
-    // 时间选择器对话框保持不变
     if (showStartTimePicker) {
         TimePickerDialog(
             title = "选择静音开始时间",
@@ -496,17 +478,17 @@ fun TimePickerCard(
 ) {
     Card(
         onClick = onClick,
-        modifier = Modifier.width(120.dp), // 增加宽度
+        modifier = Modifier.width(120.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
-        shape = RoundedCornerShape(16.dp) // 更圆润的边角
+        shape = RoundedCornerShape(16.dp)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp), // 增加内边距
+                .padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
@@ -520,7 +502,7 @@ fun TimePickerCard(
 
             Text(
                 text = time,
-                style = MaterialTheme.typography.headlineSmall, // 更大的字体
+                style = MaterialTheme.typography.headlineSmall,
                 color = MaterialTheme.colorScheme.primary,
                 fontWeight = FontWeight.Bold
             )
@@ -557,7 +539,6 @@ fun TimePickerDialog(
                     modifier = Modifier.padding(bottom = 16.dp)
                 )
 
-                // 小时滑块
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.fillMaxWidth()
@@ -587,7 +568,6 @@ fun TimePickerDialog(
 
                 Spacer(modifier = Modifier.height(12.dp))
 
-                // 显示选中的时间
                 Card(
                     colors = CardDefaults.cardColors(
                         containerColor = MaterialTheme.colorScheme.primaryContainer
@@ -659,7 +639,6 @@ fun NotificationTypesInfoCard() {
                 modifier = Modifier.padding(bottom = 12.dp)
             )
 
-            // 温度通知信息
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.padding(vertical = 8.dp)
@@ -708,7 +687,6 @@ fun NotificationTypesInfoCard() {
                 color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
             )
 
-            // 光照通知信息
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.padding(vertical = 8.dp)
@@ -754,4 +732,3 @@ fun NotificationTypesInfoCard() {
         }
     }
 }
-
