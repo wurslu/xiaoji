@@ -251,4 +251,54 @@ class SettingsViewModel(
     fun updateNotificationCooldown(minutes: Int) {
         monitorService?.updateNotificationCooldown(minutes)
     }
+
+    /**
+     * 应用启动时自动同步本地阈值设置到服务端
+     */
+    fun syncThresholdsToServer() {
+        viewModelScope.launch {
+            try {
+                // 获取本地保存的阈值
+                val currentState = _uiState.value
+
+                // 发送设置请求到服务端（静默执行，不显示加载状态）
+                apiService.setThreshold(
+                    tempThreshold = currentState.temperatureThreshold,
+                    lightThreshold = currentState.lightThreshold
+                )
+
+                // 可以选择记录日志，但不显示用户提示
+                // Log.d("SettingsViewModel", "阈值已自动同步到服务端: 温度=${currentState.temperatureThreshold}, 光照=${currentState.lightThreshold}")
+
+            } catch (e: Exception) {
+                // 静默处理错误，避免影响用户体验
+                // 可以记录日志用于调试
+                // Log.w("SettingsViewModel", "自动同步阈值失败: ${e.message}")
+            }
+        }
+    }
+
+    /**
+     * 检查是否需要同步（可选的优化）
+     */
+    fun syncThresholdsIfNeeded() {
+        viewModelScope.launch {
+            val lastSyncTime = context?.getSharedPreferences("sync_settings", Context.MODE_PRIVATE)
+                ?.getLong("last_threshold_sync", 0L) ?: 0L
+
+            val now = System.currentTimeMillis()
+            val syncInterval = 24 * 60 * 60 * 1000L // 24小时
+
+            // 如果距离上次同步超过24小时，或者是首次启动，则进行同步
+            if (now - lastSyncTime > syncInterval || lastSyncTime == 0L) {
+                syncThresholdsToServer()
+
+                // 更新同步时间
+                context?.getSharedPreferences("sync_settings", Context.MODE_PRIVATE)
+                    ?.edit()
+                    ?.putLong("last_threshold_sync", now)
+                    ?.apply()
+            }
+        }
+    }
 }

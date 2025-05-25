@@ -45,7 +45,7 @@ class MainActivity : ComponentActivity() {
 
         // 网络模块和数据库
         val httpClient = NetworkModule.provideHttpClient()
-        val apiService = NetworkModule.provideApiService(httpClient,this)
+        val apiService = NetworkModule.provideApiService(httpClient, this)
         val database = SensorDatabase.getDatabase(this)
         val sensorDao = database.sensorDao()
         val repository = SensorRepository(apiService, sensorDao)
@@ -69,7 +69,11 @@ class MainActivity : ComponentActivity() {
 
         // 启动自动清理服务
         autoCleanupManager.startAutoCleanup()
+
+        // 新增：同步本地阈值设置到服务端
+        syncThresholdsToServer()
     }
+
 
     private fun checkNotificationPermission() {
         notificationPermissionManager.checkAndRequestPermission { isGranted ->
@@ -79,6 +83,19 @@ class MainActivity : ComponentActivity() {
                     .show()
             }
         }
+    }
+
+    /**
+     * 同步本地阈值设置到服务端
+     */
+    private fun syncThresholdsToServer() {
+        // 需要获取 apiService 实例
+        val httpClient = NetworkModule.provideHttpClient()
+        val apiService = NetworkModule.provideApiService(httpClient, this)
+
+        // 创建 SettingsViewModel 实例并调用同步方法
+        val settingsViewModel = SettingsViewModel(apiService, this)
+        settingsViewModel.syncThresholdsToServer()
     }
 
     override fun onDestroy() {
