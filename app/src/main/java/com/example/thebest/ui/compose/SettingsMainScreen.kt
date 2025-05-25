@@ -27,6 +27,7 @@ fun SettingsMainScreen(
     onNavigateToThresholds: () -> Unit,
     onNavigateToNotifications: () -> Unit,
     onNavigateToGeneral: () -> Unit,
+    onNavigateToDataManagement: () -> Unit,
     onNavigateToAbout: () -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -73,7 +74,6 @@ fun SettingsMainScreen(
                 subtitle = when (setting.key) {
                     "thresholds" -> "温度 ${uiState.temperatureThreshold}°C • 光照 ${uiState.lightThreshold}"
                     "notifications" -> {
-                        // 修复：正确显示通知状态
                         when {
                             !hasNotificationPermission -> "需要权限"
                             monitoringState?.isMonitoringEnabled == true -> "已开启"
@@ -103,6 +103,7 @@ fun SettingsMainScreen(
                 onClick = {
                     when (setting.key) {
                         "general" -> onNavigateToGeneral()
+                        "data" -> onNavigateToDataManagement()
                         "about" -> onNavigateToAbout()
                         else -> {}
                     }

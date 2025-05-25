@@ -88,10 +88,10 @@ class SensorRepository(
         return sensorDao.getRecordsByDateRange(startOfDay, endOfDay)
     }
 
-    // 清理旧数据（保留最近7天）
-    suspend fun cleanOldRecords() {
-        val sevenDaysAgo = System.currentTimeMillis() - (7 * 24 * 60 * 60 * 1000L)
-        sensorDao.deleteOldRecords(sevenDaysAgo)
+    // 清理旧数据（保留最近指定天数）
+    suspend fun cleanOldRecords(retentionDays: Int = 7) {
+        val cutoffTime = System.currentTimeMillis() - (retentionDays * 24 * 60 * 60 * 1000L)
+        sensorDao.deleteOldRecords(cutoffTime)
     }
 
     // 获取记录总数
@@ -103,4 +103,70 @@ class SensorRepository(
     suspend fun clearAllRecords() {
         sensorDao.deleteAllRecords()
     }
+
+    // 新增：按时间删除记录
+    suspend fun deleteRecordsBefore(cutoffTime: Long) {
+        sensorDao.deleteOldRecords(cutoffTime)
+    }
+
+    // 新增：获取指定时间之前的记录数量
+    suspend fun getRecordCountBefore(cutoffTime: Long): Int {
+        return sensorDao.getRecordCountBefore(cutoffTime)
+    }
+
+    // 新增：获取重复记录数量（基于时间戳）
+    suspend fun getDuplicateRecordCount(): Int {
+        return sensorDao.getDuplicateRecordCount()
+    }
+
+    // 新增：删除重复记录（保留最新的一条）
+    suspend fun deleteDuplicateRecords() {
+        sensorDao.deleteDuplicateRecords()
+    }
+
+    // 新增：获取最旧记录的时间戳
+    suspend fun getOldestRecordTimestamp(): Long? {
+        return sensorDao.getOldestRecordTimestamp()
+    }
+
+    // 新增：获取最新记录的时间戳
+    suspend fun getNewestRecordTimestamp(): Long? {
+        return sensorDao.getNewestRecordTimestamp()
+    }
+
+    // 新增：按批次删除记录（用于大量数据的高效删除）
+    suspend fun deleteRecordsInBatches(cutoffTime: Long, batchSize: Int = 1000) {
+        var deletedCount: Int
+        do {
+            deletedCount = sensorDao.deleteOldRecordsBatch(cutoffTime, batchSize)
+        } while (deletedCount > 0)
+    }
+
+    // 新增：获取数据库统计信息
+    suspend fun getDatabaseStats(): DatabaseStats {
+        val totalRecords = sensorDao.getRecordCount()
+        val oldestTimestamp = sensorDao.getOldestRecordTimestamp()
+        val newestTimestamp = sensorDao.getNewestRecordTimestamp()
+        val duplicateCount = sensorDao.getDuplicateRecordCount()
+
+        val thirtyDaysAgo = System.currentTimeMillis() - (30 * 24 * 60 * 60 * 1000L)
+        val oldRecordCount = sensorDao.getRecordCountBefore(thirtyDaysAgo)
+
+        return DatabaseStats(
+            totalRecords = totalRecords,
+            oldRecordCount = oldRecordCount,
+            duplicateCount = duplicateCount,
+            oldestTimestamp = oldestTimestamp,
+            newestTimestamp = newestTimestamp
+        )
+    }
 }
+
+// 数据库统计信息数据类
+data class DatabaseStats(
+    val totalRecords: Int,
+    val oldRecordCount: Int,
+    val duplicateCount: Int,
+    val oldestTimestamp: Long?,
+    val newestTimestamp: Long?
+)

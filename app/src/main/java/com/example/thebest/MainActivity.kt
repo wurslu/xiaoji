@@ -25,14 +25,17 @@ import com.example.thebest.data.network.NetworkModule
 import com.example.thebest.data.repository.SensorRepository
 import com.example.thebest.ui.compose.*
 import com.example.thebest.ui.theme.TheBestTheme
+import com.example.thebest.ui.viewmodel.DataManagementViewModel
 import com.example.thebest.ui.viewmodel.HistoryViewModel
 import com.example.thebest.ui.viewmodel.MainViewModel
 import com.example.thebest.ui.viewmodel.SettingsViewModel
+import com.example.thebest.utils.AutoCleanupManager
 import com.example.thebest.utils.NotificationPermissionManager
 
 class MainActivity : ComponentActivity() {
 
     private lateinit var notificationPermissionManager: NotificationPermissionManager
+    private lateinit var autoCleanupManager: AutoCleanupManager
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -47,14 +50,25 @@ class MainActivity : ComponentActivity() {
         val sensorDao = database.sensorDao()
         val repository = SensorRepository(apiService, sensorDao)
 
+        // 初始化自动清理管理器
+        autoCleanupManager = AutoCleanupManager(this, repository)
+
         setContent {
             TheBestTheme {
                 MainApp(repository, apiService, this@MainActivity)
             }
         }
 
-        // 应用启动后立即检查并请求通知权限
+        // 应用启动后的初始化操作
+        initializeApp()
+    }
+
+    private fun initializeApp() {
+        // 检查并请求通知权限
         checkNotificationPermission()
+
+        // 启动自动清理服务
+        autoCleanupManager.startAutoCleanup()
     }
 
     private fun checkNotificationPermission() {
@@ -65,6 +79,12 @@ class MainActivity : ComponentActivity() {
                     .show()
             }
         }
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        // 清理资源
+        autoCleanupManager.destroy()
     }
 }
 
@@ -174,6 +194,9 @@ fun MainApp(
                     onNavigateToGeneral = {
                         navController.navigate("settings_general")
                     },
+                    onNavigateToDataManagement = {
+                        navController.navigate("settings_data_management")
+                    },
                     onNavigateToAbout = {
                         navController.navigate("settings_about")
                     }
@@ -205,6 +228,16 @@ fun MainApp(
                     SettingsViewModel(apiService, context)
                 }
                 GeneralSettingsScreen(
+                    viewModel = viewModel,
+                    onBack = { navController.popBackStack() }
+                )
+            }
+
+            composable("settings_data_management") {
+                val viewModel = viewModel<DataManagementViewModel> {
+                    DataManagementViewModel(repository, context)
+                }
+                DataManagementScreen(
                     viewModel = viewModel,
                     onBack = { navController.popBackStack() }
                 )
