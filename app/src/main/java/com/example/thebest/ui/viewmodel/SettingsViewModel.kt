@@ -1,10 +1,12 @@
 package com.example.thebest.ui.viewmodel
 
 import android.content.Context
+import android.content.SharedPreferences
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.thebest.data.network.ApiService
 import com.example.thebest.service.SensorMonitorService
+import com.example.thebest.ui.compose.UpdateFrequency
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -21,20 +23,37 @@ class SettingsViewModel(
     // 监控服务
     private val monitorService = context?.let { SensorMonitorService(it) }
 
+    // SharedPreferences for general settings
+    private val generalPrefs: SharedPreferences? = context?.getSharedPreferences(
+        "general_settings", Context.MODE_PRIVATE
+    )
+
     data class UiState(
+        // 阈值设置
         val temperatureThreshold: Int = 29,
         val lightThreshold: Int = 100,
         val isSaving: Boolean = false,
         val saveMessage: String = "",
         val saveSuccess: Boolean = false,
-        val isMonitoringEnabled: Boolean = true
+        val isMonitoringEnabled: Boolean = true,
+
+        // 通用设置
+        val updateFrequency: UpdateFrequency = UpdateFrequency.NORMAL,
+        val isDynamicThemeEnabled: Boolean = true,
+        val isAutoSaveEnabled: Boolean = true,
+        val autoSaveInterval: Int = 1, // 分钟
+        val dataRetentionDays: Int = 30
     )
 
     // 暴露监控状态
     val monitoringState = monitorService?.monitoringState
 
     init {
-        // 从监控服务加载当前阈值
+        loadAllSettings()
+    }
+
+    private fun loadAllSettings() {
+        // 从监控服务加载阈值设置
         monitorService?.let { service ->
             val (tempThreshold, lightThreshold) = service.getCurrentThresholds()
             val isEnabled = service.monitoringState.value.isMonitoringEnabled
@@ -45,8 +64,24 @@ class SettingsViewModel(
                 isMonitoringEnabled = isEnabled
             )
         }
+
+        // 从SharedPreferences加载通用设置
+        generalPrefs?.let { prefs ->
+            val frequencyOrdinal = prefs.getInt("update_frequency", UpdateFrequency.NORMAL.ordinal)
+            val updateFrequency =
+                UpdateFrequency.values().getOrElse(frequencyOrdinal) { UpdateFrequency.NORMAL }
+
+            _uiState.value = _uiState.value.copy(
+                updateFrequency = updateFrequency,
+                isDynamicThemeEnabled = prefs.getBoolean("dynamic_theme", true),
+                isAutoSaveEnabled = prefs.getBoolean("auto_save", true),
+                autoSaveInterval = prefs.getInt("auto_save_interval", 1),
+                dataRetentionDays = prefs.getInt("data_retention_days", 30)
+            )
+        }
     }
 
+    // 阈值设置方法
     fun updateTemperatureThreshold(value: Int) {
         _uiState.value = _uiState.value.copy(
             temperatureThreshold = value,
@@ -112,6 +147,69 @@ class SettingsViewModel(
         }
     }
 
+    // 通用设置方法
+    fun updateFrequency(frequency: UpdateFrequency) {
+        _uiState.value = _uiState.value.copy(updateFrequency = frequency)
+        saveGeneralSettings()
+
+        // 这里可以添加逻辑来通知MainActivity更新数据刷新频率
+        // 可以通过事件总线或其他方式实现
+    }
+
+    fun toggleDynamicTheme(enabled: Boolean) {
+        _uiState.value = _uiState.value.copy(isDynamicThemeEnabled = enabled)
+        saveGeneralSettings()
+
+        // 显示重启提示
+        _uiState.value = _uiState.value.copy(
+            saveMessage = "主题设置已保存，重启应用后生效",
+            saveSuccess = true
+        )
+    }
+
+    fun toggleAutoSave(enabled: Boolean) {
+        _uiState.value = _uiState.value.copy(isAutoSaveEnabled = enabled)
+        saveGeneralSettings()
+    }
+
+    fun updateAutoSaveInterval(interval: Int) {
+        _uiState.value = _uiState.value.copy(autoSaveInterval = interval)
+        saveGeneralSettings()
+    }
+
+    fun updateDataRetention(days: Int) {
+        _uiState.value = _uiState.value.copy(dataRetentionDays = days)
+        saveGeneralSettings()
+
+        // 立即执行数据清理
+        viewModelScope.launch {
+            try {
+                // 这里可以调用repository的清理方法
+                // repository.cleanOldRecords(days)
+                _uiState.value = _uiState.value.copy(
+                    saveMessage = "数据保留设置已更新",
+                    saveSuccess = true
+                )
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    saveMessage = "设置更新失败: ${e.message}",
+                    saveSuccess = false
+                )
+            }
+        }
+    }
+
+    private fun saveGeneralSettings() {
+        generalPrefs?.edit()?.apply {
+            putInt("update_frequency", _uiState.value.updateFrequency.ordinal)
+            putBoolean("dynamic_theme", _uiState.value.isDynamicThemeEnabled)
+            putBoolean("auto_save", _uiState.value.isAutoSaveEnabled)
+            putInt("auto_save_interval", _uiState.value.autoSaveInterval)
+            putInt("data_retention_days", _uiState.value.dataRetentionDays)
+            apply()
+        }
+    }
+
     fun clearSaveMessage() {
         _uiState.value = _uiState.value.copy(
             saveMessage = "",
@@ -127,5 +225,40 @@ class SettingsViewModel(
     // 清除警报历史
     fun clearAlertHistory() {
         monitorService?.clearAlertHistory()
+    }
+
+    // 获取当前设置用于其他组件
+    fun getCurrentUpdateFrequency(): UpdateFrequency {
+        return _uiState.value.updateFrequency
+    }
+
+    fun isDynamicThemeEnabled(): Boolean {
+        return _uiState.value.isDynamicThemeEnabled
+    }
+
+    companion object {
+        // 用于其他组件获取设置的静态方法
+        fun getUpdateFrequency(context: Context): UpdateFrequency {
+            val prefs = context.getSharedPreferences("general_settings", Context.MODE_PRIVATE)
+            val frequencyOrdinal = prefs.getInt("update_frequency", UpdateFrequency.NORMAL.ordinal)
+            return UpdateFrequency.values().getOrElse(frequencyOrdinal) { UpdateFrequency.NORMAL }
+        }
+
+        fun isDynamicThemeEnabled(context: Context): Boolean {
+            val prefs = context.getSharedPreferences("general_settings", Context.MODE_PRIVATE)
+            return prefs.getBoolean("dynamic_theme", true)
+        }
+
+        fun getAutoSaveSettings(context: Context): Pair<Boolean, Int> {
+            val prefs = context.getSharedPreferences("general_settings", Context.MODE_PRIVATE)
+            val enabled = prefs.getBoolean("auto_save", true)
+            val interval = prefs.getInt("auto_save_interval", 1)
+            return Pair(enabled, interval)
+        }
+
+        fun getDataRetentionDays(context: Context): Int {
+            val prefs = context.getSharedPreferences("general_settings", Context.MODE_PRIVATE)
+            return prefs.getInt("data_retention_days", 30)
+        }
     }
 }

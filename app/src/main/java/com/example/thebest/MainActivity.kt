@@ -23,12 +23,7 @@ import androidx.navigation.compose.rememberNavController
 import com.example.thebest.data.local.SensorDatabase
 import com.example.thebest.data.network.NetworkModule
 import com.example.thebest.data.repository.SensorRepository
-import com.example.thebest.ui.compose.HistoryDetailScreen
-import com.example.thebest.ui.compose.HistoryScreen
-import com.example.thebest.ui.compose.NotificationSettingsScreen
-import com.example.thebest.ui.compose.SensorScreen
-import com.example.thebest.ui.compose.SettingsMainScreen
-import com.example.thebest.ui.compose.SettingsScreen
+import com.example.thebest.ui.compose.*
 import com.example.thebest.ui.theme.TheBestTheme
 import com.example.thebest.ui.viewmodel.HistoryViewModel
 import com.example.thebest.ui.viewmodel.MainViewModel
@@ -45,13 +40,11 @@ class MainActivity : ComponentActivity() {
         // 初始化通知权限管理器
         notificationPermissionManager = NotificationPermissionManager(this)
 
-        // 网络模块
+        // 网络模块和数据库
         val httpClient = NetworkModule.provideHttpClient()
         val apiService = NetworkModule.provideApiService(httpClient)
-
         val database = SensorDatabase.getDatabase(this)
         val sensorDao = database.sensorDao()
-
         val repository = SensorRepository(apiService, sensorDao)
 
         setContent {
@@ -84,7 +77,7 @@ fun MainApp(
 ) {
     val navController = rememberNavController()
 
-    // 导航项目 - 新增历史数据页面
+    // 导航项目
     val items = listOf(
         NavigationItem(
             title = "监控",
@@ -140,7 +133,7 @@ fun MainApp(
         ) {
             composable("sensor") {
                 val viewModel = viewModel<MainViewModel> {
-                    MainViewModel(repository, context) // 传递Context
+                    MainViewModel(repository, context)
                 }
                 SensorScreen(viewModel = viewModel)
             }
@@ -179,10 +172,10 @@ fun MainApp(
                         navController.navigate("settings_notifications")
                     },
                     onNavigateToGeneral = {
-                        // 暂时不实现
+                        navController.navigate("settings_general")
                     },
                     onNavigateToAbout = {
-                        // 暂时不实现
+                        navController.navigate("settings_about")
                     }
                 )
             }
@@ -203,6 +196,22 @@ fun MainApp(
                 }
                 NotificationSettingsScreen(
                     viewModel = viewModel,
+                    onBack = { navController.popBackStack() }
+                )
+            }
+
+            composable("settings_general") {
+                val viewModel = viewModel<SettingsViewModel> {
+                    SettingsViewModel(apiService, context)
+                }
+                GeneralSettingsScreen(
+                    viewModel = viewModel,
+                    onBack = { navController.popBackStack() }
+                )
+            }
+
+            composable("settings_about") {
+                AboutScreen(
                     onBack = { navController.popBackStack() }
                 )
             }

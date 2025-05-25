@@ -9,6 +9,7 @@ import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalContext
+import com.example.thebest.ui.viewmodel.SettingsViewModel
 
 private val DarkColorScheme = darkColorScheme(
     primary = Purple80,
@@ -35,13 +36,15 @@ private val LightColorScheme = lightColorScheme(
 @Composable
 fun TheBestTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
-    // Dynamic color is available on Android 12+
-    dynamicColor: Boolean = true,
     content: @Composable () -> Unit
 ) {
+    val context = LocalContext.current
+
+    // 从设置中获取是否启用动态主题
+    val dynamicColor = SettingsViewModel.isDynamicThemeEnabled(context)
+
     val colorScheme = when {
         dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-            val context = LocalContext.current
             if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
         }
 

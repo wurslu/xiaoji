@@ -8,6 +8,8 @@ import com.example.thebest.data.model.SensorData
 import com.example.thebest.data.repository.SensorRepository
 import com.example.thebest.service.SensorMonitorService
 import com.example.thebest.widget.SensorWidgetProvider
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -16,7 +18,8 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
 class MainViewModel(
-    private val repository: SensorRepository, private val context: Context? = null
+    private val repository: SensorRepository,
+    private val context: Context? = null
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(UiState())
@@ -34,6 +37,10 @@ class MainViewModel(
     private val requestMutex = Mutex()
     private var isRequestInProgress = false
 
+    // 定时刷新和自动保存的Job
+    private var refreshJob: Job? = null
+    private var autoSaveJob: Job? = null
+
     data class UiState(
         val sensorData: SensorData? = null,
         val isLoading: Boolean = false,
@@ -42,16 +49,77 @@ class MainViewModel(
         val lastSaveTime: Long = 0L,
         val saveCount: Int = 0,
         val requestInterval: String = "2秒",
-        val hasActiveAlerts: Boolean = false, // 新增：是否有活跃警报
-        val alertCount: Int = 0 // 新增：警报数量
+        val hasActiveAlerts: Boolean = false,
+        val alertCount: Int = 0
     )
 
     // 暴露监控状态
     val monitoringState = monitorService?.monitoringState
 
+    init {
+        // 启动定时任务
+        startPeriodicTasks()
+    }
+
     // 检查是否正在加载中（供外部调用）
     fun isCurrentlyLoading(): Boolean {
         return isRequestInProgress || _uiState.value.isLoading
+    }
+
+    private fun startPeriodicTasks() {
+        context?.let { ctx ->
+            // 获取当前设置
+            val updateFrequency = SettingsViewModel.getUpdateFrequency(ctx)
+            val (autoSaveEnabled, autoSaveInterval) = SettingsViewModel.getAutoSaveSettings(ctx)
+
+            // 更新UI显示的间隔信息
+            _uiState.value = _uiState.value.copy(
+                requestInterval = updateFrequency.displayName
+            )
+
+            // 启动数据刷新任务
+            startRefreshTask(updateFrequency.intervalMs)
+
+            // 启动自动保存任务
+            if (autoSaveEnabled) {
+                startAutoSaveTask(autoSaveInterval * 60 * 1000L) // 转换为毫秒
+            }
+        }
+    }
+
+    private fun startRefreshTask(intervalMs: Long) {
+        refreshJob?.cancel()
+        refreshJob = viewModelScope.launch {
+            // 首次获取数据（带保存）
+            fetchSensorData()
+
+            // 等待首次加载完成
+            delay(3000)
+
+            // 定时刷新（仅更新显示）
+            while (true) {
+                if (!isCurrentlyLoading()) {
+                    refreshDataOnly()
+                }
+                delay(intervalMs)
+            }
+        }
+    }
+
+    private fun startAutoSaveTask(intervalMs: Long) {
+        autoSaveJob?.cancel()
+        autoSaveJob = viewModelScope.launch {
+            delay(intervalMs) // 首次等待
+            while (true) {
+                saveCurrentData()
+                delay(intervalMs)
+            }
+        }
+    }
+
+    // 重新启动定时任务（当设置更改时调用）
+    fun restartPeriodicTasks() {
+        startPeriodicTasks()
     }
 
     // 首次获取数据（带保存）- 添加监控检查
@@ -206,6 +274,7 @@ class MainViewModel(
                     )
                 } catch (e: Exception) {
                     // 忽略保存错误，不影响实时显示
+                    Log.w("MainViewModel", "保存数据失败: ${e.message}")
                 }
             }
         }
@@ -238,5 +307,12 @@ class MainViewModel(
     // 更新监控设置
     fun updateMonitoringSettings(tempThreshold: Int, lightThreshold: Int) {
         monitorService?.updateThresholds(tempThreshold, lightThreshold)
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        // 取消所有定时任务
+        refreshJob?.cancel()
+        autoSaveJob?.cancel()
     }
 }
