@@ -150,8 +150,11 @@ class SensorWidgetProvider : AppWidgetProvider() {
                 // 异步获取最新数据
                 CoroutineScope(Dispatchers.IO).launch {
                     try {
-                        val apiService =
-                            NetworkModule.provideApiService(NetworkModule.provideHttpClient())
+                        // 修复：添加 context 参数
+                        val apiService = NetworkModule.provideApiService(
+                            NetworkModule.provideHttpClient(),
+                            context
+                        )
                         val sensorData = apiService.getSensorData()
 
                         // 更新widget数据

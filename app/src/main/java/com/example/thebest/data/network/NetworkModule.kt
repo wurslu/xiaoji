@@ -1,5 +1,6 @@
 package com.example.thebest.data.network
 
+import android.content.Context
 import io.ktor.client.*
 import io.ktor.client.engine.android.*
 import io.ktor.client.plugins.contentnegotiation.*
@@ -19,7 +20,7 @@ object NetworkModule {
         }
     }
 
-    fun provideApiService(client: HttpClient): ApiService {
-        return ApiService(client)
+    fun provideApiService(client: HttpClient, context: Context): ApiService {
+        return ApiService(client, context)
     }
 }

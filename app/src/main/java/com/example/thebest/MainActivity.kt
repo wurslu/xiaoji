@@ -45,7 +45,7 @@ class MainActivity : ComponentActivity() {
 
         // 网络模块和数据库
         val httpClient = NetworkModule.provideHttpClient()
-        val apiService = NetworkModule.provideApiService(httpClient)
+        val apiService = NetworkModule.provideApiService(httpClient,this)
         val database = SensorDatabase.getDatabase(this)
         val sensorDao = database.sensorDao()
         val repository = SensorRepository(apiService, sensorDao)

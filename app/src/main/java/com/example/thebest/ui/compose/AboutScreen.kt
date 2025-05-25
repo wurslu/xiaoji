@@ -215,11 +215,8 @@ fun VersionInfoCard() {
     val (versionName, versionCode, appName) = remember {
         try {
             val packageInfo = context.packageManager.getPackageInfo(context.packageName, 0)
-
-            val appName = context.packageManager.getApplicationLabel(
-                context.applicationInfo
-            ).toString()
-
+            val appName =
+                context.packageManager.getApplicationLabel(context.applicationInfo).toString()
             Triple(
                 packageInfo.versionName ?: "未知",
                 packageInfo.longVersionCode.toString(),
@@ -236,16 +233,14 @@ fun VersionInfoCard() {
             val appInfo = context.applicationInfo
             Pair(appInfo.minSdkVersion, appInfo.targetSdkVersion)
         } catch (e: Exception) {
-            Pair(24, 34)
+            Pair(29, 35)
         }
     }
 
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        ),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(
@@ -261,10 +256,75 @@ fun VersionInfoCard() {
                 modifier = Modifier.padding(bottom = 16.dp)
             )
 
+            // 应用信息
             InfoRow("应用名称", appName)
             InfoRow("版本号", versionName)
             InfoRow("构建版本", versionCode)
+            InfoRow("包名", context.packageName)
+
+            Spacer(modifier = Modifier.height(12.dp))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // API 配置信息 - 从资源文件获取
+            Text(
+                text = "API 配置",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+
+            // 从资源文件获取真实配置
+            val apiBaseUrl by remember {
+                mutableStateOf(
+                    try {
+                        context.getString(
+                            context.resources.getIdentifier(
+                                "api_base_url",
+                                "string",
+                                context.packageName
+                            )
+                        )
+                    } catch (e: Exception) {
+                        "https://sensor-api.wurslu.workers.dev"
+                    }
+                )
+            }
+
+            val apiType by remember {
+                mutableStateOf(
+                    try {
+                        context.getString(
+                            context.resources.getIdentifier(
+                                "api_type",
+                                "string",
+                                context.packageName
+                            )
+                        )
+                    } catch (e: Exception) {
+                        "标准版"
+                    }
+                )
+            }
+
+            InfoRow("API 类型", apiType)
+            InfoRow("服务器地址", apiBaseUrl)
             InfoRow("发布日期", getCurrentDate())
+
+            Spacer(modifier = Modifier.height(12.dp))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // 系统信息
+            Text(
+                text = "系统信息",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+
             InfoRow(
                 "最低系统要求",
                 "Android ${getAndroidVersionName(minSdkVersion)} (API $minSdkVersion)"
@@ -374,14 +434,27 @@ private fun getAndroidVersionName(apiLevel: Int): String {
     return when (apiLevel) {
         34 -> "14"
         33 -> "13"
-        32, 31 -> "12"
+        32, 31 -> "12L"
         30 -> "11"
         29 -> "10"
-        28 -> "9"
-        27, 26 -> "8"
-        25, 24 -> "7"
-        23 -> "6"
-        22, 21 -> "5"
-        else -> "${apiLevel / 10}.${apiLevel % 10}"
+        28 -> "9（Pie）"
+        27, 26 -> "8.1/8.0（Oreo）"
+        25, 24 -> "7.1/7.0（Nougat）"
+        23 -> "6.0（Marshmallow）"
+        22, 21 -> "5.1/5.0（Lollipop）"
+        20 -> "4.4W（KitKat Wear）"
+        19 -> "4.4（KitKat）"
+        18 -> "4.3（Jelly Bean）"
+        17 -> "4.2（Jelly Bean）"
+        16 -> "4.1（Jelly Bean）"
+        15 -> "4.0.3（Ice Cream Sandwich）"
+        else -> {
+            // 高版本 API 按官方映射（如 API 35 = Android 14）
+            when (apiLevel) {
+                in 31..33 -> "12/13"
+                in 34..35 -> "14"
+                else -> "S ${apiLevel - 28}"
+            }
+        }
     }
 }

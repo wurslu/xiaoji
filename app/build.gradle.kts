@@ -21,6 +21,12 @@ android {
     }
 
     buildTypes {
+        debug {
+            isMinifyEnabled = false
+            applicationIdSuffix = ".debug"
+            versionNameSuffix = "-DEBUG"
+        }
+
         release {
             isMinifyEnabled = true
             proguardFiles(
@@ -29,13 +35,38 @@ android {
             )
         }
     }
+
+    flavorDimensions += "version"
+    productFlavors {
+        create("normal") {
+            dimension = "version"
+            applicationId = "com.example.thebest"
+
+            resValue("string", "app_name", "The Best")
+            resValue("string", "api_base_url", "http://192.168.56.17")
+            resValue("string", "api_type", "标准版")
+        }
+
+        create("cloud") {
+            dimension = "version"
+            applicationId = "com.example.thebest.cloud"
+            versionNameSuffix = "-Cloud"
+
+            resValue("string", "app_name", "The Best 云版")
+            resValue("string", "api_base_url", "https://sensor-api.wurslu.workers.dev")
+            resValue("string", "api_type", "云版")
+        }
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
+
     kotlinOptions {
         jvmTarget = "11"
     }
+
     buildFeatures {
         compose = true
     }
@@ -63,7 +94,7 @@ dependencies {
     implementation(libs.androidx.navigation.compose)
     implementation(libs.androidx.material.icons.extended)
 
-    // Room database - 使用稳定版本
+    // Room database
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
     ksp(libs.androidx.room.compiler)
