@@ -12,6 +12,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -81,57 +82,43 @@ class DataManagementViewModel(
     }
 
     private suspend fun calculateDataStatistics(): DataStatistics = withContext(Dispatchers.IO) {
-        val totalRecords = repository.getRecordCount()
+        try {
+            val totalRecords = repository.getRecordCount()
 
-        if (totalRecords == 0) {
-            return@withContext DataStatistics()
+            if (totalRecords == 0) {
+                return@withContext DataStatistics()
+            }
+
+            // 计算30天前的数据
+            val thirtyDaysAgo = System.currentTimeMillis() - (30 * 24 * 60 * 60 * 1000L)
+            val oldDataCount = repository.getRecordCountBefore(thirtyDaysAgo)
+
+            // 获取时间范围
+            val oldestTimestamp = repository.getOldestRecordTimestamp()
+            val newestTimestamp = repository.getNewestRecordTimestamp()
+
+            val daysCovered = if (oldestTimestamp != null && newestTimestamp != null) {
+                ((newestTimestamp - oldestTimestamp) / (24 * 60 * 60 * 1000L)).toInt() + 1
+            } else 0
+
+            val dateFormat = SimpleDateFormat("MM-dd HH:mm", Locale.getDefault())
+            val oldestRecord = oldestTimestamp?.let {
+                dateFormat.format(Date(it))
+            }
+            val newestRecord = newestTimestamp?.let {
+                dateFormat.format(Date(it))
+            }
+
+            DataStatistics(
+                totalRecords = totalRecords,
+                daysCovered = daysCovered,
+                oldDataCount = oldDataCount,
+                oldestRecord = oldestRecord,
+                newestRecord = newestRecord
+            )
+        } catch (e: Exception) {
+            DataStatistics()
         }
-
-        // 获取所有记录来计算统计信息
-        var allRecords: List<SensorRecord> = emptyList()
-        repository.getHistoryRecords().collect { records ->
-            allRecords = records
-            return@collect // 只收集一次
-        }
-
-        val now = System.currentTimeMillis()
-        val thirtyDaysAgo = now - (30 * 24 * 60 * 60 * 1000L)
-
-        // 计算旧数据数量（30天前）
-        val oldDataCount = allRecords.count { it.timestamp < thirtyDaysAgo }
-
-        // 计算重复数据（简单的重复检测：相同时间戳的记录）
-        val duplicateCount = allRecords.groupBy { it.timestamp }.values.sumOf {
-            maxOf(0, it.size - 1)
-        }
-
-        // 计算数据覆盖天数
-        val daysCovered = if (allRecords.isNotEmpty()) {
-            val oldestTime = allRecords.minOf { it.timestamp }
-            val newestTime = allRecords.maxOf { it.timestamp }
-            ((newestTime - oldestTime) / (24 * 60 * 60 * 1000L)).toInt() + 1
-        } else 0
-
-        // 估算数据大小（每条记录约40字节 + 数据库开销）
-        val estimatedSize = totalRecords * 60L // 包含数据库开销
-
-        val dateFormat = SimpleDateFormat("MM-dd HH:mm", Locale.getDefault())
-        val oldestRecord = if (allRecords.isNotEmpty()) {
-            dateFormat.format(Date(allRecords.minOf { it.timestamp }))
-        } else null
-        val newestRecord = if (allRecords.isNotEmpty()) {
-            dateFormat.format(Date(allRecords.maxOf { it.timestamp }))
-        } else null
-
-        DataStatistics(
-            totalRecords = totalRecords,
-            totalSizeBytes = estimatedSize,
-            daysCovered = daysCovered,
-            oldDataCount = oldDataCount,
-            duplicateCount = duplicateCount,
-            oldestRecord = oldestRecord,
-            newestRecord = newestRecord
-        )
     }
 
     private suspend fun calculateStorageInfo(): StorageInfo = withContext(Dispatchers.IO) {
@@ -177,7 +164,6 @@ class DataManagementViewModel(
         }
     }
 
-    // 数据清理功能
     fun clearData(clearType: ClearDataType) {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isProcessing = true)
@@ -185,7 +171,6 @@ class DataManagementViewModel(
             try {
                 when (clearType) {
                     ClearDataType.OLD_DATA -> clearOldData()
-                    ClearDataType.DUPLICATE_DATA -> clearDuplicateData()
                     ClearDataType.ALL -> clearAllData()
                 }
 
@@ -194,7 +179,6 @@ class DataManagementViewModel(
 
                 val message = when (clearType) {
                     ClearDataType.OLD_DATA -> "旧数据清理完成"
-                    ClearDataType.DUPLICATE_DATA -> "重复数据清理完成"
                     ClearDataType.ALL -> "所有数据已清空"
                 }
 
@@ -215,20 +199,7 @@ class DataManagementViewModel(
 
     private suspend fun clearOldData() {
         val thirtyDaysAgo = System.currentTimeMillis() - (30 * 24 * 60 * 60 * 1000L)
-        // 这里需要在 SensorDao 中添加按时间删除的方法
-        // repository.deleteRecordsBefore(thirtyDaysAgo)
-
-        // 临时实现：通过 SensorRepository 中的 cleanOldRecords 方法
-        repository.cleanOldRecords()
-    }
-
-    private suspend fun clearDuplicateData() {
-        // 这是一个复杂的操作，需要在 Repository 中实现
-        // 简化实现：这里可以先获取所有数据，找出重复项，然后删除
-        // 实际项目中建议在数据库层面通过 SQL 实现
-
-        // 临时提示用户这个功能需要进一步实现
-        throw Exception("重复数据清理功能正在开发中")
+        repository.cleanOldRecords(30)
     }
 
     private suspend fun clearAllData() {
@@ -284,42 +255,39 @@ class DataManagementViewModel(
 
         return when (exportType) {
             ExportType.ALL -> {
-                var records: List<SensorRecord> = emptyList()
-                repository.getHistoryRecords().collect {
-                    records = it
-                    return@collect
+                // 修复：使用 first() 而不是 collect
+                try {
+                    repository.getHistoryRecords().first()
+                } catch (e: Exception) {
+                    emptyList()
                 }
-                records
             }
 
             ExportType.LAST_7_DAYS -> {
                 val sevenDaysAgo = now - (7 * 24 * 60 * 60 * 1000L)
-                var records: List<SensorRecord> = emptyList()
-                repository.getRecordsByDateRange(sevenDaysAgo, now).collect {
-                    records = it
-                    return@collect
+                try {
+                    repository.getRecordsByDateRange(sevenDaysAgo, now).first()
+                } catch (e: Exception) {
+                    emptyList()
                 }
-                records
             }
 
             ExportType.LAST_30_DAYS -> {
                 val thirtyDaysAgo = now - (30 * 24 * 60 * 60 * 1000L)
-                var records: List<SensorRecord> = emptyList()
-                repository.getRecordsByDateRange(thirtyDaysAgo, now).collect {
-                    records = it
-                    return@collect
+                try {
+                    repository.getRecordsByDateRange(thirtyDaysAgo, now).first()
+                } catch (e: Exception) {
+                    emptyList()
                 }
-                records
             }
 
             ExportType.LAST_90_DAYS -> {
                 val ninetyDaysAgo = now - (90 * 24 * 60 * 60 * 1000L)
-                var records: List<SensorRecord> = emptyList()
-                repository.getRecordsByDateRange(ninetyDaysAgo, now).collect {
-                    records = it
-                    return@collect
+                try {
+                    repository.getRecordsByDateRange(ninetyDaysAgo, now).first()
+                } catch (e: Exception) {
+                    emptyList()
                 }
-                records
             }
         }
     }

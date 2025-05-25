@@ -69,7 +69,7 @@ class SettingsViewModel(
         generalPrefs?.let { prefs ->
             val frequencyOrdinal = prefs.getInt("update_frequency", UpdateFrequency.NORMAL.ordinal)
             val updateFrequency =
-                UpdateFrequency.values().getOrElse(frequencyOrdinal) { UpdateFrequency.NORMAL }
+                UpdateFrequency.entries.toTypedArray().getOrElse(frequencyOrdinal) { UpdateFrequency.NORMAL }
 
             _uiState.value = _uiState.value.copy(
                 updateFrequency = updateFrequency,
@@ -227,21 +227,12 @@ class SettingsViewModel(
         monitorService?.clearAlertHistory()
     }
 
-    // 获取当前设置用于其他组件
-    fun getCurrentUpdateFrequency(): UpdateFrequency {
-        return _uiState.value.updateFrequency
-    }
-
-    fun isDynamicThemeEnabled(): Boolean {
-        return _uiState.value.isDynamicThemeEnabled
-    }
-
     companion object {
         // 用于其他组件获取设置的静态方法
         fun getUpdateFrequency(context: Context): UpdateFrequency {
             val prefs = context.getSharedPreferences("general_settings", Context.MODE_PRIVATE)
             val frequencyOrdinal = prefs.getInt("update_frequency", UpdateFrequency.NORMAL.ordinal)
-            return UpdateFrequency.values().getOrElse(frequencyOrdinal) { UpdateFrequency.NORMAL }
+            return UpdateFrequency.entries.toTypedArray().getOrElse(frequencyOrdinal) { UpdateFrequency.NORMAL }
         }
 
         fun isDynamicThemeEnabled(context: Context): Boolean {
@@ -255,10 +246,9 @@ class SettingsViewModel(
             val interval = prefs.getInt("auto_save_interval", 1)
             return Pair(enabled, interval)
         }
+    }
 
-        fun getDataRetentionDays(context: Context): Int {
-            val prefs = context.getSharedPreferences("general_settings", Context.MODE_PRIVATE)
-            return prefs.getInt("data_retention_days", 30)
-        }
+    fun updateNotificationCooldown(minutes: Int) {
+        monitorService?.updateNotificationCooldown(minutes)
     }
 }

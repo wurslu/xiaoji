@@ -1,5 +1,6 @@
 package com.example.thebest.ui.compose
 
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -28,6 +29,7 @@ fun DataManagementScreen(
     var showClearDialog by remember { mutableStateOf(false) }
     var clearType by remember { mutableStateOf(ClearDataType.ALL) }
     var showExportDialog by remember { mutableStateOf(false) }
+    var showExportRangeDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         viewModel.loadDataStatistics()
@@ -94,8 +96,7 @@ fun DataManagementScreen(
 
             item {
                 ExportDataCard(
-                    onExportAll = { showExportDialog = true },
-                    onExportRecent = { viewModel.exportRecentData() },
+                    onExport = { showExportRangeDialog = true },
                     isExporting = uiState.isExporting
                 )
             }
@@ -168,6 +169,18 @@ fun DataManagementScreen(
                 showExportDialog = false
             },
             onDismiss = { showExportDialog = false }
+        )
+    }
+
+    // 在现有的 showExportDialog 对话框后面添加
+    if (showExportRangeDialog) {
+        ExportRangeSelectionDialog(
+            statistics = uiState.dataStatistics,
+            onExportSelected = { exportType ->
+                viewModel.exportData(exportType)
+                showExportRangeDialog = false
+            },
+            onDismiss = { showExportRangeDialog = false }
         )
     }
 
@@ -254,6 +267,7 @@ fun DataStatisticsCard(statistics: DataStatistics) {
                 )
             }
 
+            // 只显示记录数和数据天数，删除占用空间
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceEvenly
@@ -262,13 +276,6 @@ fun DataStatisticsCard(statistics: DataStatistics) {
                     icon = Icons.Default.DataUsage,
                     label = "总记录数",
                     value = "${statistics.totalRecords}",
-                    color = MaterialTheme.colorScheme.onPrimaryContainer
-                )
-
-                StatisticItem(
-                    icon = Icons.Default.Storage,
-                    label = "占用空间",
-                    value = formatFileSize(statistics.totalSizeBytes),
                     color = MaterialTheme.colorScheme.onPrimaryContainer
                 )
 
@@ -303,8 +310,7 @@ fun DataStatisticsCard(statistics: DataStatistics) {
 
 @Composable
 fun ExportDataCard(
-    onExportAll: () -> Unit,
-    onExportRecent: () -> Unit,
+    onExport: () -> Unit, // 改为单个回调
     isExporting: Boolean
 ) {
     Card(
@@ -346,41 +352,213 @@ fun ExportDataCard(
                 modifier = Modifier.padding(bottom = 16.dp)
             )
 
-            Row(
+            // 只保留一个导出按钮
+            Button(
+                onClick = onExport,
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                enabled = !isExporting,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.secondary
+                )
             ) {
-                Button(
-                    onClick = onExportAll,
-                    modifier = Modifier.weight(1f),
-                    enabled = !isExporting,
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.secondary
+                if (isExporting) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(16.dp),
+                        strokeWidth = 2.dp,
+                        color = MaterialTheme.colorScheme.onSecondary
                     )
-                ) {
-                    if (isExporting) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(16.dp),
-                            strokeWidth = 2.dp,
-                            color = MaterialTheme.colorScheme.onSecondary
-                        )
-                    } else {
-                        Icon(Icons.Default.Download, contentDescription = null)
-                    }
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(if (isExporting) "导出中..." else "导出全部")
+                } else {
+                    Icon(Icons.Default.Download, contentDescription = null)
                 }
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(if (isExporting) "导出中..." else "选择导出范围")
+            }
+        }
+    }
+}
 
-                OutlinedButton(
-                    onClick = onExportRecent,
-                    modifier = Modifier.weight(1f),
-                    enabled = !isExporting
-                ) {
-                    Icon(Icons.Default.Schedule, contentDescription = null)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("导出最近")
+@Composable
+fun ExportRangeSelectionDialog(
+    statistics: DataStatistics,
+    onExportSelected: (ExportType) -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Row(
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Default.FileDownload,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(24.dp)
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                Text(
+                    text = "选择导出范围",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        },
+        text = {
+            Column {
+                Text(
+                    text = "请选择要导出的数据时间范围：",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(bottom = 16.dp)
+                )
+
+                val exportOptions = listOf(
+                    ExportOption(
+                        type = ExportType.ALL,
+                        title = "全部数据",
+                        description = "导出所有历史记录 (${statistics.totalRecords}条)",
+                        icon = Icons.Default.Storage,
+                        recommended = false
+                    ),
+                    ExportOption(
+                        type = ExportType.LAST_7_DAYS,
+                        title = "最近7天",
+                        description = "导出一周内的数据",
+                        icon = Icons.Default.DateRange,
+                        recommended = true
+                    ),
+                    ExportOption(
+                        type = ExportType.LAST_30_DAYS,
+                        title = "最近30天",
+                        description = "导出一个月内的数据",
+                        icon = Icons.Default.CalendarMonth,
+                        recommended = false
+                    ),
+                    ExportOption(
+                        type = ExportType.LAST_90_DAYS,
+                        title = "最近90天",
+                        description = "导出三个月内的数据",
+                        icon = Icons.Default.CalendarViewMonth,
+                        recommended = false
+                    )
+                )
+
+                exportOptions.forEach { option ->
+                    ExportOptionItem(
+                        option = option,
+                        onClick = { onExportSelected(option.type) }
+                    )
+                    if (option != exportOptions.last()) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
                 }
             }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text("取消")
+            }
+        }
+    )
+}
+
+// 修改 ExportOptionItem 组件，改进选中效果
+@Composable
+fun ExportOptionItem(
+    option: ExportOption,
+    onClick: () -> Unit
+) {
+    Card(
+        onClick = onClick,
+        modifier = Modifier
+            .fillMaxWidth()
+            .then(
+                // 添加边框效果，只在推荐项显示
+                if (option.recommended) {
+                    Modifier.border(
+                        width = 2.dp,
+                        color = MaterialTheme.colorScheme.primary,
+                        shape = RoundedCornerShape(12.dp)
+                    )
+                } else {
+                    Modifier
+                }
+            ),
+        colors = CardDefaults.cardColors(
+            containerColor = if (option.recommended)
+                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.1f) // 减少背景透明度
+            else
+                MaterialTheme.colorScheme.surface
+        ),
+        shape = RoundedCornerShape(12.dp),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = option.icon,
+                contentDescription = null,
+                tint = if (option.recommended)
+                    MaterialTheme.colorScheme.primary
+                else
+                    MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(24.dp)
+            )
+
+            Spacer(modifier = Modifier.width(16.dp))
+
+            Column(modifier = Modifier.weight(1f)) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = option.title,
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = if (option.recommended) FontWeight.Bold else FontWeight.Medium,
+                        color = if (option.recommended)
+                            MaterialTheme.colorScheme.primary
+                        else
+                            MaterialTheme.colorScheme.onSurface
+                    )
+
+                    if (option.recommended) {
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Card(
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.primary
+                            ),
+                            shape = RoundedCornerShape(4.dp)
+                        ) {
+                            Text(
+                                text = "推荐",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onPrimary,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
+                }
+
+                Text(
+                    text = option.description,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 2.dp)
+                )
+            }
+
+            Icon(
+                imageVector = Icons.Default.ChevronRight,
+                contentDescription = null,
+                tint = if (option.recommended)
+                    MaterialTheme.colorScheme.primary
+                else
+                    MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(16.dp)
+            )
         }
     }
 }
@@ -423,6 +601,7 @@ fun CleanupOptionsCard(
                 )
             }
 
+            // 只保留两个清理选项，删除重复数据清理
             val cleanupOptions = listOf(
                 CleanupOption(
                     type = ClearDataType.OLD_DATA,
@@ -430,13 +609,6 @@ fun CleanupOptionsCard(
                     description = "删除30天前的数据 (约${statistics.oldDataCount}条)",
                     icon = Icons.Default.History,
                     color = MaterialTheme.colorScheme.secondary
-                ),
-                CleanupOption(
-                    type = ClearDataType.DUPLICATE_DATA,
-                    title = "清理重复数据",
-                    description = "删除重复的记录 (约${statistics.duplicateCount}条)",
-                    icon = Icons.Default.FilterList,
-                    color = MaterialTheme.colorScheme.tertiary
                 ),
                 CleanupOption(
                     type = ClearDataType.ALL,
@@ -719,7 +891,6 @@ fun StorageInfoItem(
     }
 }
 
-// 对话框组件
 @Composable
 fun ClearDataConfirmDialog(
     clearType: ClearDataType,
@@ -732,12 +903,6 @@ fun ClearDataConfirmDialog(
             "清理旧数据",
             "确定要删除30天前的数据吗？此操作不可恢复。",
             statistics.oldDataCount
-        )
-
-        ClearDataType.DUPLICATE_DATA -> Triple(
-            "清理重复数据",
-            "确定要删除重复的记录吗？此操作不可恢复。",
-            statistics.duplicateCount
         )
 
         ClearDataType.ALL -> Triple(
@@ -910,13 +1075,10 @@ fun formatFileSize(bytes: Long): String {
     return "${df.format(size)} ${units[unitIndex]}"
 }
 
-// 数据类
 data class DataStatistics(
     val totalRecords: Int = 0,
-    val totalSizeBytes: Long = 0L,
     val daysCovered: Int = 0,
-    val oldDataCount: Int = 0, // 30天前的数据数量
-    val duplicateCount: Int = 0, // 重复数据数量
+    val oldDataCount: Int = 0,
     val oldestRecord: String? = null,
     val newestRecord: String? = null
 )
@@ -937,9 +1099,8 @@ data class CleanupOption(
 )
 
 enum class ClearDataType {
-    OLD_DATA,      // 清理旧数据
-    DUPLICATE_DATA, // 清理重复数据
-    ALL            // 清空所有数据
+    OLD_DATA,
+    ALL
 }
 
 enum class ExportType {
@@ -948,3 +1109,11 @@ enum class ExportType {
     LAST_30_DAYS,  // 最近30天
     LAST_90_DAYS   // 最近90天
 }
+
+data class ExportOption(
+    val type: ExportType,
+    val title: String,
+    val description: String,
+    val icon: ImageVector,
+    val recommended: Boolean = false
+)

@@ -12,6 +12,13 @@ import java.util.*
 
 class SensorMonitorService(private val context: Context) {
 
+    private fun getNotificationCooldown(): Long {
+        val minutes = _monitoringState.value.notificationCooldownMinutes
+        return minutes * 60 * 1000L // 转换为毫秒
+    }
+
+
+
     private val notificationManager = SensorNotificationManager(context)
     private val preferences: SharedPreferences =
         context.getSharedPreferences("sensor_thresholds", Context.MODE_PRIVATE)
@@ -29,7 +36,8 @@ class SensorMonitorService(private val context: Context) {
         val temperatureThreshold: Int = 29,
         val lightThreshold: Int = 100,
         val quietHours: QuietHours = QuietHours(22, 7),
-        val alertHistory: List<AlertRecord> = emptyList()
+        val alertHistory: List<AlertRecord> = emptyList(),
+        val notificationCooldownMinutes: Int = 5
     )
 
     data class QuietHours(val startHour: Int, val endHour: Int)
@@ -121,13 +129,19 @@ class SensorMonitorService(private val context: Context) {
         }
     }
 
-    // 判断是否应该发送通知（避免频繁通知）
     private fun shouldSendNotification(type: NotificationType): Boolean {
         val lastTime = lastNotificationTimes[type] ?: 0
-        return System.currentTimeMillis() - lastTime > notificationCooldown
+        val cooldown = getNotificationCooldown()
+        return System.currentTimeMillis() - lastTime > cooldown
     }
 
-    // 记录通知发送时间
+    fun updateNotificationCooldown(minutes: Int) {
+        _monitoringState.value = _monitoringState.value.copy(
+            notificationCooldownMinutes = minutes
+        )
+        saveSettings()
+    }
+
     private fun recordNotificationTime(type: NotificationType) {
         lastNotificationTimes[type] = System.currentTimeMillis()
     }
@@ -155,7 +169,6 @@ class SensorMonitorService(private val context: Context) {
         saveSettings()
     }
 
-    // 保存设置
     private fun saveSettings() {
         val state = _monitoringState.value
         preferences.edit().apply {
@@ -164,32 +177,32 @@ class SensorMonitorService(private val context: Context) {
             putInt("light_threshold", state.lightThreshold)
             putInt("quiet_start", state.quietHours.startHour)
             putInt("quiet_end", state.quietHours.endHour)
+            putInt("notification_cooldown_minutes", state.notificationCooldownMinutes) // 新增
             apply()
         }
     }
 
-    // 加载设置
     private fun loadSettings() {
         val monitoring = preferences.getBoolean("monitoring_enabled", true)
         val tempThreshold = preferences.getInt("temp_threshold", 29)
         val lightThreshold = preferences.getInt("light_threshold", 100)
         val quietStart = preferences.getInt("quiet_start", 22)
         val quietEnd = preferences.getInt("quiet_end", 7)
+        val cooldownMinutes = preferences.getInt("notification_cooldown_minutes", 5) // 新增
 
         _monitoringState.value = MonitoringState(
             isMonitoringEnabled = monitoring,
             temperatureThreshold = tempThreshold,
             lightThreshold = lightThreshold,
-            quietHours = QuietHours(quietStart, quietEnd)
+            quietHours = QuietHours(quietStart, quietEnd),
+            notificationCooldownMinutes = cooldownMinutes // 新增
         )
     }
 
-    // 清除警报历史
     fun clearAlertHistory() {
         _monitoringState.value = _monitoringState.value.copy(alertHistory = emptyList())
     }
 
-    // 获取格式化的警报历史
     fun getFormattedAlertHistory(): List<String> {
         val dateFormat = java.text.SimpleDateFormat("MM-dd HH:mm", Locale.getDefault())
         return _monitoringState.value.alertHistory.map { alert ->
@@ -197,7 +210,6 @@ class SensorMonitorService(private val context: Context) {
         }
     }
 
-    // 获取当前阈值
     fun getCurrentThresholds(): Pair<Int, Int> {
         val state = _monitoringState.value
         return Pair(state.temperatureThreshold, state.lightThreshold)

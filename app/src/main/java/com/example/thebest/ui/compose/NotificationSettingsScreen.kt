@@ -108,6 +108,15 @@ fun NotificationSettingsScreen(
                 )
             }
 
+            item {
+                NotificationCooldownCard(
+                    cooldownMinutes = monitoringState?.notificationCooldownMinutes ?: 5,
+                    onCooldownChange = { minutes ->
+                        viewModel.updateNotificationCooldown(minutes)
+                    }
+                )
+            }
+
             // 只有在权限授权且监控开启时才显示其他设置
             if (hasNotificationPermission && monitoringState?.isMonitoringEnabled == true) {
                 item {
@@ -281,9 +290,11 @@ fun NotificationPermissionStatusCard(
                             } catch (e2: Exception) {
                                 // 最后尝试打开应用信息页面
                                 try {
-                                    val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-                                        data = android.net.Uri.parse("package:${context.packageName}")
-                                    }
+                                    val intent =
+                                        Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                                            data =
+                                                android.net.Uri.parse("package:${context.packageName}")
+                                        }
                                     context.startActivity(intent)
                                 } catch (e3: Exception) {
                                     // 忽略所有异常
@@ -300,6 +311,196 @@ fun NotificationPermissionStatusCard(
             }
         }
     }
+}
+
+@Composable
+fun NotificationCooldownCard(
+    cooldownMinutes: Int,
+    onCooldownChange: (Int) -> Unit
+) {
+    var showCooldownDialog by remember { mutableStateOf(false) }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        shape = RoundedCornerShape(16.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(20.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = Icons.Default.Timer,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.tertiary,
+                modifier = Modifier.size(24.dp)
+            )
+
+            Spacer(modifier = Modifier.width(16.dp))
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "重复通知间隔",
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = "同类型异常通知的最小间隔时间",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 4.dp)
+                )
+            }
+
+            OutlinedCard(
+                onClick = { showCooldownDialog = true },
+                colors = CardDefaults.outlinedCardColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.1f)
+                )
+            ) {
+                Text(
+                    text = "${cooldownMinutes}分钟",
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+                )
+            }
+        }
+    }
+
+    if (showCooldownDialog) {
+        NotificationCooldownDialog(
+            currentCooldown = cooldownMinutes,
+            onCooldownSelected = { minutes ->
+                onCooldownChange(minutes)
+                showCooldownDialog = false
+            },
+            onDismiss = { showCooldownDialog = false }
+        )
+    }
+}
+
+@Composable
+fun NotificationCooldownDialog(
+    currentCooldown: Int,
+    onCooldownSelected: (Int) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val cooldownOptions = listOf(
+        1 to "1分钟 (频繁)",
+        3 to "3分钟",
+        5 to "5分钟 (推荐)",
+        10 to "10分钟",
+        15 to "15分钟",
+        30 to "30分钟",
+        60 to "1小时"
+    )
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Row(
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Timer,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.tertiary,
+                    modifier = Modifier.size(24.dp)
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                Text(
+                    text = "重复通知间隔",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        },
+        text = {
+            Column {
+                Text(
+                    text = "设置同一类型异常通知的最小间隔时间，避免频繁打扰",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(bottom = 16.dp)
+                )
+
+                cooldownOptions.forEach { (minutes, description) ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        RadioButton(
+                            selected = minutes == currentCooldown,
+                            onClick = { onCooldownSelected(minutes) }
+                        )
+
+                        Spacer(modifier = Modifier.width(12.dp))
+
+                        Column {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = description,
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    fontWeight = if (minutes == 5) FontWeight.Bold else FontWeight.Normal
+                                )
+
+                                if (minutes == 5) {
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Card(
+                                        colors = CardDefaults.cardColors(
+                                            containerColor = MaterialTheme.colorScheme.tertiary
+                                        ),
+                                        shape = RoundedCornerShape(4.dp)
+                                    ) {
+                                        Text(
+                                            text = "推荐",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onTertiary,
+                                            modifier = Modifier.padding(
+                                                horizontal = 6.dp,
+                                                vertical = 2.dp
+                                            )
+                                        )
+                                    }
+                                }
+                            }
+
+                            if (minutes == 1) {
+                                Text(
+                                    text = "可能会频繁打扰",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                                )
+                            } else if (minutes >= 30) {
+                                Text(
+                                    text = "可能错过重要异常",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text("完成")
+            }
+        }
+    )
 }
 
 @Composable
